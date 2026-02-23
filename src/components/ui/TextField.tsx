@@ -1,0 +1,57 @@
+import { forwardRef } from "react";
+import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
+import { useAppTheme } from "@/src/theme/ThemeContext";
+
+interface TextFieldProps extends TextInputProps {
+  label?: string;
+  error?: string;
+}
+
+export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+  { label, error, style, ...props },
+  ref
+) {
+  const { theme } = useAppTheme();
+
+  return (
+    <View style={styles.container}>
+      {label ? <Text style={[styles.label, { color: theme.colors.text }]}>{label}</Text> : null}
+      <TextInput
+        ref={ref}
+        style={[
+          styles.input,
+          {
+            color: theme.colors.text,
+            backgroundColor: theme.colors.inputBackground,
+            borderColor: error ? theme.colors.danger : theme.colors.border,
+          },
+          style,
+        ]}
+        placeholderTextColor={theme.colors.textMuted}
+        {...props}
+      />
+      {error ? <Text style={[styles.error, { color: theme.colors.danger }]}>{error}</Text> : null}
+    </View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  input: {
+    height: 48,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  error: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+});
