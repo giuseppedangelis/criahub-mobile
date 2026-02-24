@@ -19,7 +19,7 @@ export function UnsupportedRoleScreen() {
           </Text>
           <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}> 
             O perfil <Text style={{ fontWeight: "700" }}>{formatRole(role)}</Text> ainda não possui
-            fluxo mobile nesta fase. Perfil ativo no momento: Criador.
+            fluxo mobile nesta fase. Perfis ativos no momento: Criador, Veterinaria e Campo.
           </Text>
           <AppButton
             label="Sair da conta"

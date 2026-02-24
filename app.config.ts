@@ -10,7 +10,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "criahub-mobile",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/images/icon.png",
+  icon: "./assets/images/icon-criahub.png",
   scheme: "criahubmobile",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -25,7 +25,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/images/adaptive-icon.png",
+      foregroundImage: "./assets/images/adaptive-icon-criahub.png",
       backgroundColor: "#0d0d0d",
     },
     edgeToEdgeEnabled: true,
@@ -36,7 +36,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     bundler: "metro",
     output: "static",
-    favicon: "./assets/images/favicon.png",
+    favicon: "./assets/images/favicon-criahub.png",
   },
   plugins: ["expo-router", "expo-video"],
   experiments: {
