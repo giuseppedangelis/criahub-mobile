@@ -3,7 +3,6 @@ import { LoadingState } from "@/src/components/ui/LoadingState";
 import { useAuth } from "@/src/contexts/AuthContext";
 import {
   getDefaultAppRouteForRole,
-  isCreatorRole,
   isMobileSupportedRole,
 } from "@/src/lib/roles";
 
@@ -19,7 +18,6 @@ export default function Index() {
   }
 
   if (isMobileSupportedRole(role)) {
-    if (isCreatorRole(role)) return <Redirect href="/(app)/(tabs)/plantel" />;
     return <Redirect href={getDefaultAppRouteForRole(role) as "/(app)/unsupported"} />;
   }
 

@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 
@@ -24,7 +25,9 @@ export function AppScreen({
         edges={["top", "left", "right"]}
         style={[styles.safeArea, { backgroundColor: theme.colors.background }, style]}
       >
-        <ScrollView
+        <KeyboardAwareScrollView
+          bottomOffset={24}
+          extraKeyboardSpace={18}
           contentContainerStyle={[
             styles.scrollContainer,
             { paddingBottom: 24 + insets.bottom },
@@ -34,7 +37,7 @@ export function AppScreen({
           showsVerticalScrollIndicator={false}
         >
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     );
   }

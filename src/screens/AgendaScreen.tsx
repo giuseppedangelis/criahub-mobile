@@ -1,13 +1,15 @@
 import { CalendarDays, PlusCircle } from "lucide-react-native";
-import { StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAgendaQuery } from "@/src/hooks/useAgenda";
-import { isCreatorRole } from "@/src/lib/roles";
+import { isCreatorRole, isVeterinaryRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
+import type { AgendaEventItem } from "@/src/types/domain";
 import { formatDateBR } from "@/src/utils/format";
 
 function formatTime(value: string | null) {
@@ -21,9 +23,13 @@ export function AgendaScreen() {
   const { role, harasId } = useAuth();
   const { theme } = useAppTheme();
   const { data, isLoading, error } = useAgendaQuery(harasId);
+  const [selectedEvent, setSelectedEvent] = useState<AgendaEventItem | null>(null);
 
-  const isCreator = isCreatorRole(role);
-  const canAccess = isCreator;
+  const canAccess = isCreatorRole(role) || isVeterinaryRole(role);
+
+  const closeModal = () => {
+    setSelectedEvent(null);
+  };
 
   if (!canAccess) {
     return (
@@ -31,7 +37,7 @@ export function AgendaScreen() {
         <View style={styles.centered}>
           <EmptyState
             title="Agenda indisponível"
-            description="Disponível nesta fase apenas para o perfil Criador."
+            description="Disponível nesta fase para Criador e Veterinária."
           />
         </View>
       </AppScreen>
@@ -62,10 +68,20 @@ export function AgendaScreen() {
           </Text>
         ) : data && data.length > 0 ? (
           data.slice(0, 14).map((item) => (
-            <View key={item.id} style={[styles.itemRow, { borderColor: theme.colors.border }]}> 
+            <Pressable
+              key={item.id}
+              onPress={() => setSelectedEvent(item)}
+              style={({ pressed }) => [
+                styles.itemRow,
+                {
+                  borderColor: theme.colors.border,
+                  opacity: pressed ? 0.78 : 1,
+                },
+              ]}
+            >
               <View style={{ flex: 1 }}>
                 <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.titulo}</Text>
-                <Text style={[styles.itemType, { color: theme.colors.textMuted }]}>
+                <Text style={[styles.itemType, { color: theme.colors.textMuted }]}> 
                   {item.tipo} {item.animal_name ? `• ${item.animal_name}` : ""}
                 </Text>
                 <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}> 
@@ -73,7 +89,7 @@ export function AgendaScreen() {
                 </Text>
               </View>
               <Text style={[styles.itemTime, { color: theme.colors.text }]}>{item.status || "-"}</Text>
-            </View>
+            </Pressable>
           ))
         ) : (
           <Text style={[styles.line, { color: theme.colors.textMuted }]}>Nenhum evento encontrado.</Text>
@@ -89,6 +105,73 @@ export function AgendaScreen() {
           Agenda conectada aos eventos do haras. Os eventos ficam centralizados apenas neste módulo.
         </Text>
       </Card>
+
+      <Modal
+        visible={Boolean(selectedEvent)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdrop} onPress={closeModal} />
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Detalhes do evento</Text>
+              <Text style={[styles.modalStatus, { color: theme.colors.textMuted }]}>
+                {selectedEvent?.status || "Sem status"}
+              </Text>
+            </View>
+
+            <Text style={[styles.modalEventName, { color: theme.colors.text }]}>{selectedEvent?.titulo || "-"}</Text>
+
+            <View style={styles.modalRows}>
+              <Text style={[styles.modalRow, { color: theme.colors.textMuted }]}> 
+                Tipo: <Text style={[styles.modalValue, { color: theme.colors.text }]}>{selectedEvent?.tipo || "-"}</Text>
+              </Text>
+              <Text style={[styles.modalRow, { color: theme.colors.textMuted }]}> 
+                Início: <Text style={[styles.modalValue, { color: theme.colors.text }]}>{selectedEvent ? `${formatDateBR(selectedEvent.data_inicio)} às ${formatTime(selectedEvent.data_inicio)}` : "-"}</Text>
+              </Text>
+              {selectedEvent?.data_fim ? (
+                <Text style={[styles.modalRow, { color: theme.colors.textMuted }]}> 
+                  Término: <Text style={[styles.modalValue, { color: theme.colors.text }]}>{`${formatDateBR(selectedEvent.data_fim)} às ${formatTime(selectedEvent.data_fim)}`}</Text>
+                </Text>
+              ) : null}
+              <Text style={[styles.modalRow, { color: theme.colors.textMuted }]}> 
+                Animal: <Text style={[styles.modalValue, { color: theme.colors.text }]}>{selectedEvent?.animal_name || "Não informado"}</Text>
+              </Text>
+              <Text style={[styles.modalRow, { color: theme.colors.textMuted }]}> 
+                Local: <Text style={[styles.modalValue, { color: theme.colors.text }]}>{selectedEvent?.local || "Não informado"}</Text>
+              </Text>
+              <Text style={[styles.modalRow, { color: theme.colors.textMuted }]}> 
+                Responsável: <Text style={[styles.modalValue, { color: theme.colors.text }]}>{selectedEvent?.responsavel || "Não informado"}</Text>
+              </Text>
+            </View>
+
+            <Text style={[styles.modalDescription, { color: theme.colors.textMuted }]}>
+              {selectedEvent?.descricao || "Sem observações para este evento."}
+            </Text>
+
+            <Pressable
+              onPress={closeModal}
+              style={({ pressed }) => [
+                styles.modalCloseButton,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.inputBackground,
+                  opacity: pressed ? 0.82 : 1,
+                },
+              ]}
+            >
+              <Text style={[styles.modalCloseLabel, { color: theme.colors.text }]}>Fechar</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </AppScreen>
   );
 }
@@ -150,5 +233,63 @@ const styles = StyleSheet.create({
   hintText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.58)",
+  },
+  modalCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  modalStatus: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  modalEventName: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  modalRows: {
+    gap: 6,
+  },
+  modalRow: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  modalValue: {
+    fontWeight: "600",
+  },
+  modalDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  modalCloseButton: {
+    height: 42,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCloseLabel: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

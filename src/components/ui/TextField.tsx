@@ -12,6 +12,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
   ref
 ) {
   const { theme } = useAppTheme();
+  const isMultiline = Boolean(props.multiline);
 
   return (
     <View style={styles.container}>
@@ -20,6 +21,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         ref={ref}
         style={[
           styles.input,
+          isMultiline && styles.multilineInput,
           {
             color: theme.colors.text,
             backgroundColor: theme.colors.inputBackground,
@@ -49,6 +51,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     fontSize: 15,
+  },
+  multilineInput: {
+    height: undefined,
+    minHeight: 112,
+    paddingTop: 12,
+    paddingBottom: 12,
+    textAlignVertical: "top",
   },
   error: {
     fontSize: 12,

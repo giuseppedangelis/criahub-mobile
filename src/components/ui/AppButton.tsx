@@ -1,5 +1,8 @@
+import type { ComponentType } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAppTheme } from "@/src/theme/ThemeContext";
+
+type ButtonIcon = ComponentType<{ size?: number; color?: string }>;
 
 interface AppButtonProps {
   label: string;
@@ -7,6 +10,7 @@ interface AppButtonProps {
   disabled?: boolean;
   loading?: boolean;
   variant?: "primary" | "ghost" | "danger";
+  icon?: ButtonIcon;
 }
 
 export function AppButton({
@@ -15,6 +19,7 @@ export function AppButton({
   disabled = false,
   loading = false,
   variant = "primary",
+  icon: Icon,
 }: AppButtonProps) {
   const { theme } = useAppTheme();
   const isDisabled = disabled || loading;
@@ -56,6 +61,7 @@ export function AppButton({
         <ActivityIndicator color={variantStyle.color} />
       ) : (
         <View style={styles.content}>
+          {Icon ? <Icon size={16} color={variantStyle.color} /> : null}
           <Text style={[styles.label, { color: variantStyle.color }]}>{label}</Text>
         </View>
       )}

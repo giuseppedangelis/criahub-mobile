@@ -16,6 +16,11 @@ export function normalizeRole(role?: string | null): NormalizedRole {
       return "criador";
     case "breeder":
       return "breeder";
+    case "veterinario":
+    case "veterinaria":
+    case "veterinary":
+    case "vet":
+      return "veterinario";
     case "assessor":
       return "assessor";
     case "acessor":
@@ -26,6 +31,8 @@ export function normalizeRole(role?: string | null): NormalizedRole {
       return "employee";
     case "funcionario":
       return "funcionario";
+    case "peao":
+      return "peao";
     default:
       return "unknown";
   }
@@ -36,11 +43,27 @@ export function isCreatorRole(role?: string | null): boolean {
   return normalized === "criador" || normalized === "breeder";
 }
 
+export function isVeterinaryRole(role?: string | null): boolean {
+  const normalized = normalizeRole(role);
+  return normalized === "veterinario" || normalized === "vet";
+}
+
+export function isFieldStaffRole(role?: string | null): boolean {
+  const normalized = normalizeRole(role);
+  return (
+    normalized === "peao" ||
+    normalized === "funcionario" ||
+    normalized === "employee"
+  );
+}
+
 export function isMobileSupportedRole(role?: string | null): boolean {
-  return isCreatorRole(role);
+  return isCreatorRole(role) || isVeterinaryRole(role) || isFieldStaffRole(role);
 }
 
 export function getDefaultAppRouteForRole(role?: string | null): string {
+  if (isFieldStaffRole(role)) return "/(app)/(tabs)/campo";
+  if (isVeterinaryRole(role)) return "/(app)/(tabs)/veterinaria";
   if (isCreatorRole(role)) return "/(app)/(tabs)/plantel";
   return "/(app)/unsupported";
 }
@@ -53,13 +76,17 @@ export function getRoleLabel(role?: string | null): string {
     case "criador":
     case "breeder":
       return "Criador";
+    case "veterinario":
+    case "vet":
+      return "Veterinária";
     case "assessor":
     case "acessor":
     case "advisor":
       return "Assessor";
     case "employee":
     case "funcionario":
-      return "Funcionário";
+    case "peao":
+      return "Peão";
     default:
       return "Perfil desconhecido";
   }

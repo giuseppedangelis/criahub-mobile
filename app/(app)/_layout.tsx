@@ -29,6 +29,7 @@ export default function AppLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="animal/[id]" options={{ headerShown: true, title: "Animal" }} />
+      <Stack.Screen name="vet-prontuario/[id]" options={{ headerShown: true, title: "Prontuário" }} />
       <Stack.Screen name="unsupported" />
     </Stack>
   );

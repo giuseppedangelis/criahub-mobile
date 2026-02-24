@@ -1,7 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useLayoutEffect } from "react";
-import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { Card } from "@/src/components/ui/Card";
 import { EmptyState } from "@/src/components/ui/EmptyState";
@@ -50,6 +61,29 @@ function formatHealthType(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function supportsInlineVideo(url: string) {
+  if (!url) return false;
+  const blockedDomains = /youtube\.com|youtu\.be|vimeo\.com/i;
+  if (blockedDomains.test(url)) return false;
+  return true;
+}
+
+function InlineVideoPlayer({ url }: { url: string }) {
+  const player = useVideoPlayer({ uri: url }, (instance) => {
+    instance.loop = false;
+  });
+
+  return (
+    <VideoView
+      style={styles.inlineVideoPlayer}
+      player={player}
+      nativeControls
+      allowsFullscreen
+      contentFit="contain"
+    />
+  );
+}
+
 function DetailRow({ label, value }: { label: string; value: string }) {
   const { theme } = useAppTheme();
   return (
@@ -76,11 +110,17 @@ function MetaBadge({ label }: { label: string }) {
 
 export function AnimalDetailScreen() {
   const { theme } = useAppTheme();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const modalViewportWidth = Math.min(screenWidth - 32, 460);
+  const modalViewportHeight = Math.min(Math.max(screenHeight * 0.68, 300), 520);
   const navigation = useNavigation();
+  const photoPagerRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ id?: string }>();
   const animalId = useMemo(() => params.id || "", [params.id]);
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
 
   const { data: animal, isLoading, error } = useAnimalQuery(animalId, Boolean(animalId));
   const {
@@ -99,6 +139,35 @@ export function AnimalDetailScreen() {
       headerTintColor: theme.colors.text,
     });
   }, [animal?.name, navigation, theme.colors.surface, theme.colors.text]);
+
+  const photoUrls = useMemo(() => {
+    if (animal?.images && animal.images.length > 0) return animal.images;
+    if (animal?.main_image_url) return [animal.main_image_url];
+    return [];
+  }, [animal?.images, animal?.main_image_url]);
+
+  const videos = extra?.videos ?? [];
+  const selectedVideo = videos.find((item) => item.id === selectedVideoId) ?? null;
+
+  useEffect(() => {
+    if (!isPhotoModalVisible) return;
+    const timer = setTimeout(() => {
+      photoPagerRef.current?.scrollTo({ x: activePhotoIndex * modalViewportWidth, animated: false });
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [activePhotoIndex, isPhotoModalVisible, modalViewportWidth]);
+
+  useEffect(() => {
+    if (activeTab !== "videos") return;
+    if (videos.length === 0) {
+      setSelectedVideoId(null);
+      return;
+    }
+    const selectedExists = videos.some((item) => item.id === selectedVideoId);
+    if (!selectedVideoId || !selectedExists) {
+      setSelectedVideoId(videos[0].id);
+    }
+  }, [activeTab, selectedVideoId, videos]);
 
   if (!animalId) {
     return (
@@ -136,17 +205,31 @@ export function AnimalDetailScreen() {
     );
   }
 
-  const photoUrls =
-    animal.images && animal.images.length > 0
-      ? animal.images
-      : animal.main_image_url
-        ? [animal.main_image_url]
-        : [];
-
   const openExternalUrl = async (url: string) => {
     const canOpen = await Linking.canOpenURL(url);
     if (!canOpen) return;
     await Linking.openURL(url);
+  };
+
+  const onOpenPhoto = (index: number) => {
+    setActivePhotoIndex(index);
+    setIsPhotoModalVisible(true);
+  };
+
+  const onClosePhotoModal = () => {
+    setIsPhotoModalVisible(false);
+  };
+
+  const onPreviousPhoto = () => {
+    const nextIndex = Math.max(0, activePhotoIndex - 1);
+    setActivePhotoIndex(nextIndex);
+    photoPagerRef.current?.scrollTo({ x: nextIndex * modalViewportWidth, animated: true });
+  };
+
+  const onNextPhoto = () => {
+    const nextIndex = Math.min(photoUrls.length - 1, activePhotoIndex + 1);
+    setActivePhotoIndex(nextIndex);
+    photoPagerRef.current?.scrollTo({ x: nextIndex * modalViewportWidth, animated: true });
   };
 
   return (
@@ -259,7 +342,7 @@ export function AnimalDetailScreen() {
                     {photoUrls.map((url, index) => (
                       <Pressable
                         key={`${url}-${index}`}
-                        onPress={() => setActivePhotoIndex(index)}
+                        onPress={() => onOpenPhoto(index)}
                         style={({ pressed }) => [
                           styles.photoCard,
                           {
@@ -310,18 +393,69 @@ export function AnimalDetailScreen() {
           <Card>
             <SectionTitle title="Galeria de Vídeos" />
             {extra?.videos.length ? (
-              extra.videos.slice(0, 25).map((video) => (
+              <>
+                {selectedVideo ? (
+                  <View style={styles.featuredVideoSection}>
+                    {supportsInlineVideo(selectedVideo.url) ? (
+                      <InlineVideoPlayer url={selectedVideo.url} />
+                    ) : getVideoThumbnail(selectedVideo.url, selectedVideo.thumbnail_url) ? (
+                      <Image
+                        source={{ uri: getVideoThumbnail(selectedVideo.url, selectedVideo.thumbnail_url) as string }}
+                        style={styles.featuredVideoFallback}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.featuredVideoFallback,
+                          styles.featuredVideoFallbackEmpty,
+                          { borderColor: theme.colors.border },
+                        ]}
+                      >
+                        <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>Sem prévia disponível</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.featuredVideoHeader}>
+                      <Text style={[styles.featuredVideoTitle, { color: theme.colors.text }]}>{selectedVideo.title}</Text>
+                      <View style={[styles.statusPill, { backgroundColor: theme.colors.info + "20" }]}>
+                        <Text style={[styles.statusPillText, { color: theme.colors.info }]}>{selectedVideo.type}</Text>
+                      </View>
+                    </View>
+
+                    {!supportsInlineVideo(selectedVideo.url) ? (
+                      <Text style={[styles.videoNote, { color: theme.colors.textMuted }]}> 
+                        Este link abre melhor no navegador.
+                      </Text>
+                    ) : null}
+
+                    <Pressable
+                      onPress={() => {
+                        void openExternalUrl(selectedVideo.url);
+                      }}
+                      style={({ pressed }) => [styles.linkButton, { opacity: pressed ? 0.75 : 1 }]}
+                    >
+                      <Text style={[styles.itemLink, { color: theme.colors.primary }]}>Abrir vídeo em tela externa</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {(extra?.videos ?? []).slice(0, 25).map((video) => (
                 <View key={video.id} style={[styles.listRow, { borderColor: theme.colors.border }]}> 
                   <View style={{ flex: 1 }}>
-                    {getVideoThumbnail(video.url, video.thumbnail_url) ? (
+                    <Pressable onPress={() => setSelectedVideoId(video.id)}>
+                      {getVideoThumbnail(video.url, video.thumbnail_url) ? (
                       <Image
                         source={{ uri: getVideoThumbnail(video.url, video.thumbnail_url) as string }}
                         style={styles.videoThumb}
                         resizeMode="cover"
                       />
-                    ) : null}
+                      ) : null}
+                    </Pressable>
                     <View style={styles.itemTitleRow}>
-                      <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{video.title}</Text>
+                      <Pressable onPress={() => setSelectedVideoId(video.id)} style={styles.videoTitlePressable}>
+                        <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{video.title}</Text>
+                      </Pressable>
                       <View style={[styles.statusPill, { backgroundColor: theme.colors.info + "20" }]}> 
                         <Text style={[styles.statusPillText, { color: theme.colors.info }]}>{video.type}</Text>
                       </View>
@@ -333,6 +467,15 @@ export function AnimalDetailScreen() {
                       Data: {formatDateBR(video.created_at)}
                     </Text>
                     <Pressable
+                      onPress={() => setSelectedVideoId(video.id)}
+                      style={({ pressed }) => [
+                        styles.selectVideoButton,
+                        { borderColor: theme.colors.border, opacity: pressed ? 0.75 : 1 },
+                      ]}
+                    >
+                      <Text style={[styles.selectVideoLabel, { color: theme.colors.text }]}>Ver no player</Text>
+                    </Pressable>
+                    <Pressable
                       onPress={() => {
                         void openExternalUrl(video.url);
                       }}
@@ -342,7 +485,8 @@ export function AnimalDetailScreen() {
                     </Pressable>
                   </View>
                 </View>
-              ))
+                ))}
+              </>
             ) : (
               <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>Nenhum vídeo registrado.</Text>
             )}
@@ -362,7 +506,7 @@ export function AnimalDetailScreen() {
                   {photoUrls.map((url, index) => (
                     <Pressable
                       key={`${url}-${index}`}
-                      onPress={() => setActivePhotoIndex(index)}
+                      onPress={() => onOpenPhoto(index)}
                       style={({ pressed }) => [
                         styles.photoCardLarge,
                         {
@@ -552,6 +696,100 @@ export function AnimalDetailScreen() {
             )}
           </Card>
         ) : null}
+
+        <Modal
+          visible={isPhotoModalVisible && photoUrls.length > 0}
+          transparent
+          animationType="fade"
+          onRequestClose={onClosePhotoModal}
+        >
+          <View style={styles.photoModalRoot}>
+            <Pressable style={styles.photoModalBackdrop} onPress={onClosePhotoModal} />
+            <View style={styles.photoModalContent}>
+              <ScrollView
+                ref={photoPagerRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={[styles.photoPager, { width: modalViewportWidth, height: modalViewportHeight }]}
+                onMomentumScrollEnd={(event) => {
+                  const nextIndex = Math.round(event.nativeEvent.contentOffset.x / modalViewportWidth);
+                  setActivePhotoIndex(nextIndex);
+                }}
+              >
+                {photoUrls.map((url, index) => (
+                  <View key={`${url}-modal-${index}`} style={[styles.photoSlide, { width: modalViewportWidth }]}>
+                    <ScrollView
+                      style={styles.photoZoomScroll}
+                      contentContainerStyle={styles.photoZoomContent}
+                      maximumZoomScale={3}
+                      minimumZoomScale={1}
+                      bouncesZoom
+                      pinchGestureEnabled
+                      centerContent
+                      showsHorizontalScrollIndicator={false}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      <Image source={{ uri: url }} style={styles.photoModalImage} resizeMode="contain" />
+                    </ScrollView>
+                  </View>
+                ))}
+              </ScrollView>
+
+              <View style={styles.photoModalFooter}>
+                <Pressable
+                  onPress={onPreviousPhoto}
+                  disabled={activePhotoIndex === 0}
+                  style={({ pressed }) => [
+                    styles.photoModalButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                      opacity: activePhotoIndex === 0 ? 0.35 : pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.photoModalButtonLabel, { color: theme.colors.text }]}>Anterior</Text>
+                </Pressable>
+
+                <Text style={[styles.photoModalCounter, { color: theme.colors.text }]}> 
+                  Foto {activePhotoIndex + 1} de {photoUrls.length}
+                </Text>
+
+                <Pressable
+                  onPress={onNextPhoto}
+                  disabled={activePhotoIndex >= photoUrls.length - 1}
+                  style={({ pressed }) => [
+                    styles.photoModalButton,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surface,
+                      opacity: activePhotoIndex >= photoUrls.length - 1 ? 0.35 : pressed ? 0.8 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.photoModalButtonLabel, { color: theme.colors.text }]}>Próxima</Text>
+                </Pressable>
+              </View>
+
+              <Text style={[styles.photoModalHint, { color: theme.colors.textMuted }]}>Use dois dedos para zoom</Text>
+
+              <Pressable
+                onPress={onClosePhotoModal}
+                style={({ pressed }) => [
+                  styles.photoModalClose,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surface,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+              >
+                <Text style={[styles.photoModalCloseLabel, { color: theme.colors.text }]}>Fechar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </AppScreen>
   );
@@ -725,6 +963,135 @@ const styles = StyleSheet.create({
   },
   photoCounter: {
     fontSize: 12,
+  },
+  photoModalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  photoModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.82)",
+  },
+  photoModalContent: {
+    width: "100%",
+    maxWidth: 460,
+    alignItems: "center",
+    gap: 12,
+  },
+  photoPager: {
+    borderRadius: 14,
+  },
+  photoSlide: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoModalImage: {
+    width: "100%",
+    height: "100%",
+  },
+  photoZoomScroll: {
+    width: "100%",
+    height: "100%",
+  },
+  photoZoomContent: {
+    flexGrow: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoModalFooter: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  photoModalButton: {
+    minHeight: 40,
+    minWidth: 86,
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  photoModalButtonLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  photoModalCounter: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  photoModalHint: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  photoModalClose: {
+    minHeight: 40,
+    minWidth: 110,
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  photoModalCloseLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  inlineVideoPlayer: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: "#000000",
+  },
+  featuredVideoSection: {
+    gap: 10,
+    marginBottom: 10,
+  },
+  featuredVideoFallback: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+  },
+  featuredVideoFallbackEmpty: {
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featuredVideoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  featuredVideoTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  videoTitlePressable: {
+    flex: 1,
+  },
+  selectVideoButton: {
+    marginTop: 6,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+  },
+  selectVideoLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  videoNote: {
+    fontSize: 12,
+    lineHeight: 18,
   },
   videoThumb: {
     width: "100%",

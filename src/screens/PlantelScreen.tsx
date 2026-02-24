@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react-native";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
@@ -63,30 +63,60 @@ function AnimalItem({ item, onPress }: { item: Animal; onPress: (animalId: strin
           <View style={styles.itemTitleWrapper}>
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.name}</Text>
             <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>
-              Registro: {item.registry_number || "Não informado"}
+              Registro {item.registry_number || "não informado"}
             </Text>
           </View>
           <StatusBadge status={item.status} />
         </View>
 
         <View style={styles.itemMetaRow}>
-          <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>
-            Sexo: {item.sex}
-          </Text>
-          <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>
-            Categoria: {formatCategoryLabel(item.category)}
-          </Text>
+          <View
+            style={[
+              styles.itemMetaPill,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.inputBackground,
+              },
+            ]}
+          >
+            <Text style={[styles.itemMetaLabel, { color: theme.colors.textMuted }]}>Sexo</Text>
+            <Text style={[styles.itemMetaValue, { color: theme.colors.text }]}>{item.sex}</Text>
+          </View>
+          <View
+            style={[
+              styles.itemMetaPill,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.inputBackground,
+              },
+            ]}
+          >
+            <Text style={[styles.itemMetaLabel, { color: theme.colors.textMuted }]}>Categoria</Text>
+            <Text style={[styles.itemMetaValue, { color: theme.colors.text }]}>
+              {formatCategoryLabel(item.category)}
+            </Text>
+          </View>
         </View>
       </Card>
     </Pressable>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   const { theme } = useAppTheme();
   return (
-    <Card style={styles.summaryCard}>
-      <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>{label}</Text>
+    <Card
+      style={[
+        styles.summaryCard,
+        highlight && {
+          borderColor: theme.colors.primary,
+          backgroundColor: theme.mode === "dark" ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.03)",
+        },
+      ]}
+    >
+      <Text style={[styles.summaryLabel, { color: highlight ? theme.colors.text : theme.colors.textMuted }]}>
+        {label}
+      </Text>
       <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{value}</Text>
     </Card>
   );
@@ -102,6 +132,7 @@ export function PlantelScreen() {
   const [sexFilter, setSexFilter] = useState<SexFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -139,6 +170,19 @@ export function PlantelScreen() {
   const maleCount = items.filter((item) => item.sex === "Macho").length;
   const femaleCount = items.filter((item) => item.sex === "Fêmea").length;
   const activeCount = items.filter((item) => item.status === "ativo").length;
+  const hasActiveFilters = sexFilter !== "all" || statusFilter !== "all" || categoryFilter !== "all";
+
+  const selectedFiltersText = [
+    sexFilter !== "all" ? `Sexo: ${sexFilter}` : null,
+    statusFilter !== "all"
+      ? `Status: ${STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label ?? statusFilter}`
+      : null,
+    categoryFilter !== "all"
+      ? `Categoria: ${CATEGORY_OPTIONS.find((option) => option.value === categoryFilter)?.label ?? categoryFilter}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" • ");
 
   const onPressAnimal = (id: string) => {
     router.push({
@@ -155,72 +199,127 @@ export function PlantelScreen() {
     setPage((current) => Math.min(totalPages, current + 1));
   };
 
+  const clearFilters = () => {
+    setSexFilter("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+  };
+
   const ListHeader = (
     <View style={styles.headerContent}>
       <BrandLogo compact />
-      <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Plantel</Text>
-      <Text style={[styles.pageSubtitle, { color: theme.colors.textMuted }]}> 
-        Consulta completa dos animais do seu haras.
-      </Text>
+      <Card style={styles.heroCard}>
+        <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Plantel</Text>
+        <Text style={[styles.pageSubtitle, { color: theme.colors.textMuted }]}>Consulta completa dos animais do seu haras.</Text>
 
-      <View style={styles.summaryGrid}>
-        <SummaryCard label="Total" value={String(total)} />
+        <SearchInput
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="Buscar por nome ou registro"
+        />
+
+        <View style={styles.filterActionsRow}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.filterToggle,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.inputBackground,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            onPress={() => setShowFilters((current) => !current)}
+          >
+            <Text style={[styles.filterToggleLabel, { color: theme.colors.text }]}>Filtros</Text>
+            {hasActiveFilters ? (
+              <View style={[styles.filterCounter, { backgroundColor: theme.colors.primary }]}>
+                <Text style={[styles.filterCounterLabel, { color: theme.colors.primaryText }]}>Ativo</Text>
+              </View>
+            ) : null}
+            {showFilters ? (
+              <ChevronUp size={16} color={theme.colors.textMuted} />
+            ) : (
+              <ChevronDown size={16} color={theme.colors.textMuted} />
+            )}
+          </Pressable>
+
+          {hasActiveFilters ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.clearFiltersButton,
+                { borderColor: theme.colors.border, opacity: pressed ? 0.75 : 1 },
+              ]}
+              onPress={clearFilters}
+            >
+              <Text style={[styles.clearFiltersLabel, { color: theme.colors.textMuted }]}>Limpar</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {hasActiveFilters && !showFilters ? (
+          <Text style={[styles.selectedFiltersText, { color: theme.colors.textMuted }]}>{selectedFiltersText}</Text>
+        ) : null}
+
+        {showFilters ? (
+          <View style={styles.filtersWrapper}>
+            <View style={styles.filterGroup}>
+              <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Sexo</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {SEX_OPTIONS.map((option) => (
+                  <FilterChip
+                    key={option.value}
+                    label={option.label}
+                    active={sexFilter === option.value}
+                    onPress={() => setSexFilter(option.value)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.filterGroup}>
+              <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Status</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {STATUS_OPTIONS.map((option) => (
+                  <FilterChip
+                    key={option.value}
+                    label={option.label}
+                    active={statusFilter === option.value}
+                    onPress={() => setStatusFilter(option.value)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.filterGroup}>
+              <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Categoria</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <FilterChip
+                    key={option.value}
+                    label={option.label}
+                    active={categoryFilter === option.value}
+                    onPress={() => setCategoryFilter(option.value)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        ) : null}
+      </Card>
+
+      <View style={styles.summaryHeader}>
+        <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Visão rápida</Text>
+        <Text style={[styles.summaryHint, { color: theme.colors.textMuted }]}>Página {page} de {totalPages}</Text>
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.summaryScrollContent}>
+        <SummaryCard label="Total" value={String(total)} highlight />
         <SummaryCard label="Machos" value={String(maleCount)} />
         <SummaryCard label="Fêmeas" value={String(femaleCount)} />
         <SummaryCard label="Ativos" value={String(activeCount)} />
-      </View>
+      </ScrollView>
 
-      <SearchInput
-        value={searchText}
-        onChangeText={setSearchText}
-        placeholder="Buscar por nome ou registro"
-      />
-
-      <View style={styles.filterGroup}>
-        <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Sexo</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {SEX_OPTIONS.map((option) => (
-            <FilterChip
-              key={option.value}
-              label={option.label}
-              active={sexFilter === option.value}
-              onPress={() => setSexFilter(option.value)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.filterGroup}>
-        <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Status</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {STATUS_OPTIONS.map((option) => (
-            <FilterChip
-              key={option.value}
-              label={option.label}
-              active={statusFilter === option.value}
-              onPress={() => setStatusFilter(option.value)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.filterGroup}>
-        <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Categoria</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {CATEGORY_OPTIONS.map((option) => (
-            <FilterChip
-              key={option.value}
-              label={option.label}
-              active={categoryFilter === option.value}
-              onPress={() => setCategoryFilter(option.value)}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      <Text style={[styles.resultsText, { color: theme.colors.textMuted }]}>
-        {total} animal(is) encontrado(s)
-      </Text>
+      <Text style={[styles.resultsText, { color: theme.colors.textMuted }]}>{total} animal(is) encontrado(s)</Text>
     </View>
   );
 
@@ -349,18 +448,17 @@ const styles = StyleSheet.create({
     paddingBottom: 110,
   },
   headerContent: {
-    gap: 14,
+    gap: 12,
     marginBottom: 16,
   },
-  summaryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
+  heroCard: {
+    gap: 12,
   },
   summaryCard: {
-    width: "48%",
-    minHeight: 76,
+    width: 132,
+    minHeight: 84,
     justifyContent: "center",
+    gap: 6,
   },
   summaryLabel: {
     fontSize: 12,
@@ -372,14 +470,83 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
   },
-  pageTitle: {
-    fontSize: 28,
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+  },
+  summaryTitle: {
+    fontSize: 15,
     fontWeight: "700",
-    marginTop: 4,
+  },
+  summaryHint: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  summaryScrollContent: {
+    gap: 10,
+    paddingRight: 12,
+  },
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: "700",
   },
   pageSubtitle: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  filterActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterToggle: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterToggleLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  filterCounter: {
+    marginLeft: "auto",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    minHeight: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterCounterLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  clearFiltersButton: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearFiltersLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  selectedFiltersText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  filtersWrapper: {
+    gap: 12,
   },
   filterGroup: {
     gap: 8,
@@ -392,11 +559,12 @@ const styles = StyleSheet.create({
   },
   chips: {
     gap: 8,
-    paddingRight: 12,
+    paddingRight: 4,
   },
   resultsText: {
     fontSize: 13,
     fontWeight: "500",
+    paddingHorizontal: 2,
   },
   itemCard: {
     gap: 10,
@@ -421,10 +589,24 @@ const styles = StyleSheet.create({
   },
   itemMetaRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 14,
+    gap: 8,
   },
-  itemMeta: {
+  itemMetaPill: {
+    flex: 1,
+    minHeight: 56,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 2,
+  },
+  itemMetaLabel: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    fontWeight: "700",
+  },
+  itemMetaValue: {
     fontSize: 13,
     fontWeight: "500",
   },
