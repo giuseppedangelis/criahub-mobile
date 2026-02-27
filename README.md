@@ -59,6 +59,10 @@ src/
 - `docs/web-reference/DOCUMENTACAO_GERAL_SISTEMA.md`
 - `docs/web-reference/PLANEJAMENTO_DESENVOLVIMENTO.md`
 
+## Integração Mobile x Banco
+- `docs/mobile-integration/INTEGRATION_PLAYBOOK.md`
+- `docs/mobile-integration/AUDIT_AND_SEED.sql`
+
 ## Segurança
 - O arquivo `.env.local` contém chaves sensíveis por decisão de projeto.
 - No cliente mobile, somente `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` são usadas para conexão Supabase.

@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
+import { resolveUserHarasId } from "@/src/lib/haras";
 import { normalizeRole } from "@/src/lib/roles";
 import type { UserProfile, UserRole } from "@/src/types/domain";
 
@@ -61,13 +62,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     const normalizedRole = normalizeRole(data.role);
+    const resolvedHarasId = await resolveUserHarasId(supabase, userId, data.haras_id ?? null);
     const nextProfile: UserProfile = {
       id: data.id,
       email: data.email ?? null,
       full_name: data.full_name ?? null,
       avatar_url: data.avatar_url ?? null,
       role: normalizedRole,
-      haras_id: data.haras_id ?? null,
+      haras_id: resolvedHarasId,
       phone: data.phone ?? null,
     };
 

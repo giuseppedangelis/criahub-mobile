@@ -34,6 +34,19 @@ export function VetPlantelScreen() {
     );
   }
 
+  if (!harasId) {
+    return (
+      <AppScreen>
+        <View style={styles.centered}>
+          <EmptyState
+            title="Haras não vinculado"
+            description="Seu perfil veterinário está sem haras ativo. Ajuste o vínculo para carregar o plantel."
+          />
+        </View>
+      </AppScreen>
+    );
+  }
+
   const animals = query.data?.data ?? [];
 
   const totals = useMemo(() => {

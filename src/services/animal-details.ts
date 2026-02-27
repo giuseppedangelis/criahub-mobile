@@ -76,6 +76,7 @@ export interface AnimalExtendedDetails {
   locations: AnimalLocationHistoryItem[];
   offspring: AnimalOffspringItem[];
   timeline: AnimalTimelineItem[];
+  warnings?: string[];
 }
 
 function formatReproductionEventType(value: string) {
@@ -97,109 +98,138 @@ function formatExamResult(result: string | null, laboratorio: string | null) {
 
 export const animalDetailsService = {
   async getByAnimal(animalId: string, harasId: string): Promise<AnimalExtendedDetails> {
-    const [
-      documentsRes,
-      reproductionDocsRes,
-      videosRes,
-      legacyVideosRes,
-      awardsRes,
-      healthRes,
-      vaccinesRes,
-      examsRes,
-      locationsRes,
-      reproductiveEventsRes,
-      offspringRes,
-    ] = await Promise.all([
-      supabase
-        .from("documents")
-        .select("id, titulo, tipo, file_url, observacoes, created_at")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("reproduction_documents")
-        .select("id, title, document_type, file_url, created_at")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("animal_videos")
-        .select("id, title, url, type, visibility, caption, duration, thumbnail_url, created_at")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("videos")
-        .select("id, titulo, descricao, video_url, thumbnail_url, duracao, created_at")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("awards")
-        .select("id, evento, local, data_evento, categoria, colocacao, pontuacao, observacoes")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("data_evento", { ascending: false }),
-      supabase
-        .from("health_records")
-        .select("id, data_procedimento, tipo, veterinario, descricao, observacoes")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("data_procedimento", { ascending: false }),
-      supabase
-        .from("vaccines")
-        .select("id, data_aplicacao, nome_vacina, veterinario, observacoes")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("data_aplicacao", { ascending: false }),
-      supabase
-        .from("exams")
-        .select("id, data_exame, tipo_exame, veterinario, resultado, laboratorio, observacoes")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("data_exame", { ascending: false }),
-      supabase
-        .from("animal_location_history")
-        .select("id, changed_at, previous_location, new_location, reason, service_type, notes")
-        .eq("haras_id", harasId)
-        .eq("animal_id", animalId)
-        .order("changed_at", { ascending: false }),
-      supabase
-        .from("reproductive_events")
-        .select("id, event_type, event_date, observations")
-        .eq("haras_id", harasId)
-        .or(`animal_id.eq.${animalId},mare_id.eq.${animalId},stallion_id.eq.${animalId}`)
-        .order("event_date", { ascending: false })
-        .limit(40),
-      supabase
-        .from("animals")
-        .select("id, nome, registro, data_nascimento, sexo, status")
-        .eq("haras_id", harasId)
-        .or(`pai_id.eq.${animalId},mae_id.eq.${animalId}`)
-        .order("data_nascimento", { ascending: false })
-        .limit(60),
-    ]);
+    const queryDefs = [
+      {
+        key: "documents",
+        query: supabase
+          .from("documents")
+          .select("id, titulo, tipo, file_url, observacoes, created_at")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("created_at", { ascending: false }),
+      },
+      {
+        key: "reproduction_documents",
+        query: supabase
+          .from("reproduction_documents")
+          .select("id, title, document_type, file_url, created_at")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("created_at", { ascending: false }),
+      },
+      {
+        key: "animal_videos",
+        query: supabase
+          .from("animal_videos")
+          .select("id, title, url, type, visibility, caption, duration, thumbnail_url, created_at")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("created_at", { ascending: false }),
+      },
+      {
+        key: "videos",
+        query: supabase
+          .from("videos")
+          .select("id, titulo, descricao, video_url, thumbnail_url, duracao, created_at")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("created_at", { ascending: false }),
+      },
+      {
+        key: "awards",
+        query: supabase
+          .from("awards")
+          .select("id, evento, local, data_evento, categoria, colocacao, pontuacao, observacoes")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("data_evento", { ascending: false }),
+      },
+      {
+        key: "health_records",
+        query: supabase
+          .from("health_records")
+          .select("id, data_procedimento, tipo, veterinario, descricao, observacoes")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("data_procedimento", { ascending: false }),
+      },
+      {
+        key: "vaccines",
+        query: supabase
+          .from("vaccines")
+          .select("id, data_aplicacao, nome_vacina, veterinario, observacoes")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("data_aplicacao", { ascending: false }),
+      },
+      {
+        key: "exams",
+        query: supabase
+          .from("exams")
+          .select("id, data_exame, tipo_exame, veterinario, resultado, laboratorio, observacoes")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("data_exame", { ascending: false }),
+      },
+      {
+        key: "animal_location_history",
+        query: supabase
+          .from("animal_location_history")
+          .select("id, changed_at, previous_location, new_location, reason, service_type, notes")
+          .eq("haras_id", harasId)
+          .eq("animal_id", animalId)
+          .order("changed_at", { ascending: false }),
+      },
+      {
+        key: "reproductive_events",
+        query: supabase
+          .from("reproductive_events")
+          .select("id, event_type, event_date, observations")
+          .eq("haras_id", harasId)
+          .or(`animal_id.eq.${animalId},mare_id.eq.${animalId},stallion_id.eq.${animalId}`)
+          .order("event_date", { ascending: false })
+          .limit(40),
+      },
+      {
+        key: "offspring",
+        query: supabase
+          .from("animals")
+          .select("id, nome, registro, data_nascimento, sexo, status")
+          .eq("haras_id", harasId)
+          .or(`pai_id.eq.${animalId},mae_id.eq.${animalId}`)
+          .order("data_nascimento", { ascending: false })
+          .limit(60),
+      },
+    ] as const;
 
-    const allErrors = [
-      documentsRes.error,
-      reproductionDocsRes.error,
-      videosRes.error,
-      legacyVideosRes.error,
-      awardsRes.error,
-      healthRes.error,
-      vaccinesRes.error,
-      examsRes.error,
-      locationsRes.error,
-      reproductiveEventsRes.error,
-      offspringRes.error,
-    ].filter(Boolean);
+    const settled = await Promise.all(queryDefs.map((item) => item.query));
+    const resultMap = new Map<string, any[]>();
+    const warnings: string[] = [];
 
-    if (allErrors.length > 0) {
-      handleSupabaseError(allErrors[0] as any);
-    }
+    settled.forEach((result, index) => {
+      const key = queryDefs[index].key;
+      if (result.error) {
+        warnings.push(`Falha ao carregar ${key}: ${result.error.message}`);
+        resultMap.set(key, []);
+        return;
+      }
+      resultMap.set(key, result.data ?? []);
+    });
+
+    const documentsResData = resultMap.get("documents") ?? [];
+    const reproductionDocsResData = resultMap.get("reproduction_documents") ?? [];
+    const videosResData = resultMap.get("animal_videos") ?? [];
+    const legacyVideosResData = resultMap.get("videos") ?? [];
+    const awardsResData = resultMap.get("awards") ?? [];
+    const healthResData = resultMap.get("health_records") ?? [];
+    const vaccinesResData = resultMap.get("vaccines") ?? [];
+    const examsResData = resultMap.get("exams") ?? [];
+    const locationsResData = resultMap.get("animal_location_history") ?? [];
+    const reproductiveEventsResData = resultMap.get("reproductive_events") ?? [];
+    const offspringResData = resultMap.get("offspring") ?? [];
 
     const documents: AnimalDocumentItem[] = [
-      ...(documentsRes.data ?? []).map((item) => ({
+      ...documentsResData.map((item) => ({
         id: item.id,
         title: item.titulo,
         type: item.tipo,
@@ -207,7 +237,7 @@ export const animalDetailsService = {
         notes: item.observacoes ?? null,
         created_at: item.created_at ?? null,
       })),
-      ...(reproductionDocsRes.data ?? []).map((item) => ({
+      ...reproductionDocsResData.map((item) => ({
         id: item.id,
         title: item.title,
         type: item.document_type,
@@ -218,7 +248,7 @@ export const animalDetailsService = {
     ].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
 
     const videos: AnimalVideoItem[] = [
-      ...(videosRes.data ?? []).map((item) => ({
+      ...videosResData.map((item) => ({
         id: item.id,
         title: item.title,
         url: item.url,
@@ -229,7 +259,7 @@ export const animalDetailsService = {
         thumbnail_url: item.thumbnail_url ?? null,
         created_at: item.created_at ?? null,
       })),
-      ...(legacyVideosRes.data ?? []).map((item) => ({
+      ...legacyVideosResData.map((item) => ({
         id: item.id,
         title: item.titulo,
         url: item.video_url,
@@ -242,7 +272,7 @@ export const animalDetailsService = {
       })),
     ].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
 
-    const awards: AnimalAwardItem[] = (awardsRes.data ?? []).map((item) => ({
+    const awards: AnimalAwardItem[] = awardsResData.map((item) => ({
       id: item.id,
       evento: item.evento,
       local: item.local ?? null,
@@ -254,7 +284,7 @@ export const animalDetailsService = {
     }));
 
     const health: AnimalHealthItem[] = [
-      ...(healthRes.data ?? []).map((item) => ({
+      ...healthResData.map((item) => ({
         id: item.id,
         data: item.data_procedimento ?? null,
         tipo: item.tipo,
@@ -262,7 +292,7 @@ export const animalDetailsService = {
         descricao: item.descricao ?? null,
         observacoes: item.observacoes ?? null,
       })),
-      ...(vaccinesRes.data ?? []).map((item) => ({
+      ...vaccinesResData.map((item) => ({
         id: item.id,
         data: item.data_aplicacao ?? null,
         tipo: `Vacina: ${item.nome_vacina}`,
@@ -270,7 +300,7 @@ export const animalDetailsService = {
         descricao: null,
         observacoes: item.observacoes ?? null,
       })),
-      ...(examsRes.data ?? []).map((item) => ({
+      ...examsResData.map((item) => ({
         id: item.id,
         data: item.data_exame ?? null,
         tipo: `Exame: ${item.tipo_exame}`,
@@ -280,7 +310,7 @@ export const animalDetailsService = {
       })),
     ].sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")));
 
-    const locations: AnimalLocationHistoryItem[] = (locationsRes.data ?? []).map((item) => ({
+    const locations: AnimalLocationHistoryItem[] = locationsResData.map((item) => ({
       id: item.id,
       changed_at: item.changed_at ?? null,
       previous_location: item.previous_location ?? null,
@@ -290,7 +320,7 @@ export const animalDetailsService = {
       notes: item.notes ?? null,
     }));
 
-    const offspring: AnimalOffspringItem[] = (offspringRes.data ?? []).map((item) => ({
+    const offspring: AnimalOffspringItem[] = offspringResData.map((item) => ({
       id: item.id,
       nome: item.nome,
       registro: item.registro ?? null,
@@ -300,7 +330,7 @@ export const animalDetailsService = {
     }));
 
     const timeline: AnimalTimelineItem[] = [
-      ...(reproductiveEventsRes.data ?? []).map((item) => ({
+      ...reproductiveEventsResData.map((item) => ({
         id: item.id,
         type: "Reprodução",
         title: formatReproductionEventType(item.event_type),
@@ -338,6 +368,7 @@ export const animalDetailsService = {
       locations,
       offspring,
       timeline,
+      warnings,
     };
   },
 };

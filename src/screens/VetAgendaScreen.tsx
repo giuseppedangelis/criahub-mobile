@@ -45,6 +45,19 @@ export function VetAgendaScreen() {
     );
   }
 
+  if (!harasId) {
+    return (
+      <AppScreen>
+        <View style={styles.centered}>
+          <EmptyState
+            title="Haras não vinculado"
+            description="Seu perfil veterinário está sem haras ativo. Ajuste o vínculo para carregar agenda e tarefas."
+          />
+        </View>
+      </AppScreen>
+    );
+  }
+
   const dashboardQuery = useVeterinaryDashboardQuery(harasId);
   const agendaQuery = useAgendaQuery(harasId);
 
@@ -125,7 +138,7 @@ export function VetAgendaScreen() {
             </Pressable>
           ))
         ) : (
-          <Text style={[styles.line, { color: theme.colors.textMuted }]}>Nenhuma tarefa vet para hoje.</Text>
+          <Text style={[styles.line, { color: theme.colors.textMuted }]}>Nenhuma tarefa na janela operacional (7 dias passados + 30 futuros).</Text>
         )}
       </Card>
 

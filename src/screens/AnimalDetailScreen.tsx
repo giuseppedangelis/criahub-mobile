@@ -147,6 +147,7 @@ export function AnimalDetailScreen() {
   }, [animal?.images, animal?.main_image_url]);
 
   const videos = extra?.videos ?? [];
+  const extraWarnings = extra?.warnings ?? [];
   const selectedVideo = videos.find((item) => item.id === selectedVideoId) ?? null;
 
   useEffect(() => {
@@ -311,6 +312,13 @@ export function AnimalDetailScreen() {
           <Card>
             <Text style={[styles.warningText, { color: theme.colors.warning }]}> 
               Alguns blocos não foram carregados: {extraError instanceof Error ? extraError.message : "erro"}
+            </Text>
+          </Card>
+        ) : null}
+        {!extraError && extraWarnings.length > 0 ? (
+          <Card>
+            <Text style={[styles.warningText, { color: theme.colors.warning }]}> 
+              Alguns blocos estão indisponíveis no momento.
             </Text>
           </Card>
         ) : null}

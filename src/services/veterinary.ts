@@ -438,6 +438,10 @@ export const veterinaryService = {
   async getDashboard(harasId: string): Promise<VetDashboardData> {
     const today = new Date().toISOString().slice(0, 10);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgoDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const nextThirtyDaysDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
     const cacheKey = dashboardCacheKey(harasId);
 
     try {
@@ -446,7 +450,8 @@ export const veterinaryService = {
           .from("tasks")
           .select("id, animal_id, task_type, title, observations, due_date, status, priority, source_table, source_id")
           .eq("haras_id", harasId)
-          .lte("due_date", today)
+          .gte("due_date", sevenDaysAgoDate)
+          .lte("due_date", nextThirtyDaysDate)
           .neq("status", "concluida")
           .order("priority", { ascending: false })
           .order("due_date", { ascending: true })
