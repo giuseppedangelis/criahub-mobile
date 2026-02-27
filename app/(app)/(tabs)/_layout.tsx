@@ -88,6 +88,8 @@ export default function TabsLayout() {
             tabBarIcon: ({ color, size }) => <UserRound color={color} size={size} />,
           }}
         />
+        <Tabs.Screen name="campo" options={{ href: null }} />
+        <Tabs.Screen name="buscar-animal" options={{ href: null }} />
       </Tabs>
     );
   }
