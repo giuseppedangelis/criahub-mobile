@@ -1,4 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import {
+  Activity,
+  CalendarDays,
+  ClipboardList,
+  RefreshCw,
+  ShieldPlus,
+  Syringe,
+} from "lucide-react-native";
 import {
   Modal,
   Pressable,
@@ -7,32 +16,29 @@ import {
   Text,
   View,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
-import { Activity, RefreshCw, ShieldPlus, Syringe } from "lucide-react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { AppScreen } from "@/src/components/ui/AppScreen";
-import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
+import { DateField } from "@/src/components/ui/DateField";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { useHealthSummary } from "@/src/hooks/useAnimalHealth";
 import { useAnimalsQuery } from "@/src/hooks/useAnimals";
 import {
   useAddSemenEntryMutation,
-  useCompleteVetTaskMutation,
   useCreateBreedingEventMutation,
   useCreateHealthBatchMutation,
   useCreateReproductiveExamMutation,
   useCreateTreatmentMutation,
   useFlushVetQueueMutation,
-  useRegisterLavageOutcomeMutation,
   useSemenInventoryQuery,
-  useVeterinarySyncSnapshotQuery,
   useVeterinaryDashboardQuery,
+  useVeterinarySyncSnapshotQuery,
 } from "@/src/hooks/useVeterinary";
 import { isVeterinaryRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
-import { formatDateBR } from "@/src/utils/format";
 
 const EDEMA_OPTIONS = [0, 1, 2, 3, 4];
 const CERVIX_OPTIONS = [0, 1, 2, 3];
@@ -72,7 +78,9 @@ function AnimalSelector({
 
   return (
     <View style={styles.selectorBlock}>
-      <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>{title}</Text>
+      <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>
+        {title}
+      </Text>
       <TextField
         value={search}
         onChangeText={setSearch}
@@ -81,7 +89,8 @@ function AnimalSelector({
       <View style={[styles.selectorList, { borderColor: theme.colors.border }]}>
         <ScrollView nestedScrollEnabled style={styles.selectorScroll}>
           {filtered.slice(0, 40).map((item) => {
-            const active = selectedId === item.id || Boolean(isSelected?.(item.id));
+            const active =
+              selectedId === item.id || Boolean(isSelected?.(item.id));
             return (
               <Pressable
                 key={item.id}
@@ -89,13 +98,24 @@ function AnimalSelector({
                 style={({ pressed }) => [
                   styles.selectorItem,
                   {
-                    borderColor: active ? theme.colors.primary : theme.colors.border,
-                    backgroundColor: active ? theme.colors.surfaceAlt : "transparent",
+                    borderColor: active
+                      ? theme.colors.primary
+                      : theme.colors.border,
+                    backgroundColor: active
+                      ? theme.colors.surfaceAlt
+                      : "transparent",
                     opacity: pressed ? 0.8 : 1,
                   },
                 ]}
               >
-                <Text style={[styles.selectorItemLabel, { color: theme.colors.text }]}>{item.name}</Text>
+                <Text
+                  style={[
+                    styles.selectorItemLabel,
+                    { color: theme.colors.text },
+                  ]}
+                >
+                  {item.name}
+                </Text>
               </Pressable>
             );
           })}
@@ -109,8 +129,12 @@ function QuickKpi({ label, value }: { label: string; value: string }) {
   const { theme } = useAppTheme();
   return (
     <Card style={styles.kpiCard}>
-      <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.kpiValue, { color: theme.colors.text }]}>{value}</Text>
+      <Text style={[styles.kpiLabel, { color: theme.colors.textMuted }]}>
+        {label}
+      </Text>
+      <Text style={[styles.kpiValue, { color: theme.colors.text }]}>
+        {value}
+      </Text>
     </Card>
   );
 }
@@ -122,29 +146,36 @@ export function VeterinaryScreen() {
   const canAccess = isVeterinaryRole(role);
 
   const dashboardQuery = useVeterinaryDashboardQuery(harasId);
+  const healthSummaryQuery = useHealthSummary(harasId);
   const semenQuery = useSemenInventoryQuery(harasId);
   const syncSnapshotQuery = useVeterinarySyncSnapshotQuery(harasId);
   const femalesQuery = useAnimalsQuery(
     { haras_id: harasId ?? undefined, sex: "Fêmea", status: "ativo" },
     { page: 1, limit: 160 },
-    canAccess
+    canAccess,
   );
   const stallionsQuery = useAnimalsQuery(
     { haras_id: harasId ?? undefined, sex: "Macho", status: "ativo" },
     { page: 1, limit: 120 },
-    canAccess
+    canAccess,
+  );
+  const allAnimalsQuery = useAnimalsQuery(
+    { haras_id: harasId ?? undefined, status: "ativo" },
+    { page: 1, limit: 260 },
+    canAccess,
   );
 
   const createExamMutation = useCreateReproductiveExamMutation(harasId);
   const createBreedingMutation = useCreateBreedingEventMutation(harasId);
   const createBatchMutation = useCreateHealthBatchMutation(harasId);
   const addSemenMutation = useAddSemenEntryMutation(harasId);
-  const completeTaskMutation = useCompleteVetTaskMutation(harasId);
   const createTreatmentMutation = useCreateTreatmentMutation(harasId);
-  const registerLavageOutcomeMutation = useRegisterLavageOutcomeMutation(harasId);
   const flushQueueMutation = useFlushVetQueueMutation(harasId);
 
-  const [message, setMessage] = useState<{ text: string; tone: "success" | "warning" | "danger" } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    tone: "success" | "warning" | "danger";
+  } | null>(null);
 
   const [examModalOpen, setExamModalOpen] = useState(false);
   const [examAnimalId, setExamAnimalId] = useState("");
@@ -161,28 +192,41 @@ export function VeterinaryScreen() {
   const [mareId, setMareId] = useState("");
   const [stallionId, setStallionId] = useState("");
   const [method, setMethod] = useState<"IA" | "Monta" | "Transfer">("IA");
-  const [semenType, setSemenType] = useState<"Fresco" | "Resfriado" | "Congelado">("Congelado");
-  const [motilityQuality, setMotilityQuality] = useState<"Ótima" | "Boa" | "Regular" | "Ruim">("Boa");
+  const [semenType, setSemenType] = useState<
+    "Fresco" | "Resfriado" | "Congelado"
+  >("Congelado");
+  const [motilityQuality, setMotilityQuality] = useState<
+    "Ótima" | "Boa" | "Regular" | "Ruim"
+  >("Boa");
   const [motilityPercent, setMotilityPercent] = useState("");
   const [strawsUsed, setStrawsUsed] = useState("1");
   const [inseminationNotes, setInseminationNotes] = useState("");
 
   const [batchModalOpen, setBatchModalOpen] = useState(false);
-  const [batchProcedureType, setBatchProcedureType] = useState<"Vacina" | "Vermífugo">("Vacina");
+  const [batchProcedureType, setBatchProcedureType] = useState<
+    "Vacina" | "Vermífugo"
+  >("Vacina");
   const [batchProcedureName, setBatchProcedureName] = useState("");
   const [batchDate, setBatchDate] = useState(todayIsoDate());
   const [batchLot, setBatchLot] = useState("");
   const [batchExpiration, setBatchExpiration] = useState("");
   const [batchNotes, setBatchNotes] = useState("");
-  const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>({});
-  const [batchCategoryFilter, setBatchCategoryFilter] = useState<"all" | "egua" | "garanhao" | "potro" | "potra" | "castrado">("all");
+  const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [batchCategoryFilter, setBatchCategoryFilter] = useState<
+    "all" | "egua" | "garanhao" | "potro" | "potra" | "castrado"
+  >("all");
 
   const [semenEntryModalOpen, setSemenEntryModalOpen] = useState(false);
   const [entryStallionId, setEntryStallionId] = useState("");
   const [entryUnits, setEntryUnits] = useState("1");
-  const [entrySemenType, setEntrySemenType] = useState<"Fresco" | "Resfriado" | "Congelado">("Congelado");
+  const [entrySemenType, setEntrySemenType] = useState<
+    "Fresco" | "Resfriado" | "Congelado"
+  >("Congelado");
   const [entryReason, setEntryReason] = useState("");
   const [entryNotes, setEntryNotes] = useState("");
+
   const [treatmentModalOpen, setTreatmentModalOpen] = useState(false);
   const [treatmentAnimalId, setTreatmentAnimalId] = useState("");
   const [treatmentType, setTreatmentType] = useState("");
@@ -192,26 +236,17 @@ export function VeterinaryScreen() {
   const [treatmentMedication, setTreatmentMedication] = useState("");
   const [treatmentDosage, setTreatmentDosage] = useState("");
   const [treatmentNotes, setTreatmentNotes] = useState("");
-
-  const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "Pendente" | "Concluído">("all");
-  const [taskPriorityFilter, setTaskPriorityFilter] = useState<"all" | "Alta" | "Média" | "Baixa">("all");
-  const [taskSearch, setTaskSearch] = useState("");
-
-  const [lavageModalOpen, setLavageModalOpen] = useState(false);
-  const [selectedLavageTaskId, setSelectedLavageTaskId] = useState("");
-  const [lavageOutcome, setLavageOutcome] = useState<"positivo" | "negativo">("positivo");
-  const [lavageAction, setLavageAction] = useState<"transferir" | "congelar">("transferir");
-  const [lavageRecipientId, setLavageRecipientId] = useState("");
-  const [lavageNotes, setLavageNotes] = useState("");
+  const [treatmentFormError, setTreatmentFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canAccess) return;
     flushQueueMutation.mutate(undefined, {
       onSuccess: (flushed) => {
         if (flushed > 0) {
-          setMessage({ text: `${flushed} registro(s) offline sincronizado(s).`, tone: "success" });
-        } else {
-          setMessage({ text: "Sem pendências de sincronização no momento.", tone: "success" });
+          setMessage({
+            text: `${flushed} registro(s) offline sincronizado(s).`,
+            tone: "success",
+          });
         }
       },
     });
@@ -249,38 +284,46 @@ export function VeterinaryScreen() {
     );
   }
 
-  const females = (femalesQuery.data?.data ?? []).map((item) => ({ id: item.id, name: item.name }));
-  const stallions = (stallionsQuery.data?.data ?? []).map((item) => ({ id: item.id, name: item.name }));
-  const allAnimalsSource = [...(femalesQuery.data?.data ?? []), ...(stallionsQuery.data?.data ?? [])];
+  const femalesSource = (femalesQuery.data?.data ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+  }));
+  const stallions = (stallionsQuery.data?.data ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+  }));
+  const allAnimalsSource = (allAnimalsQuery.data?.data ?? []).length
+    ? allAnimalsQuery.data?.data ?? []
+    : [...(femalesQuery.data?.data ?? []), ...(stallionsQuery.data?.data ?? [])];
+  const females = femalesSource.length
+    ? femalesSource
+    : allAnimalsSource.map((item) => ({ id: item.id, name: item.name }));
   const allAnimals = allAnimalsSource
-    .filter((item) => (batchCategoryFilter === "all" ? true : item.category === batchCategoryFilter))
+    .filter((item) =>
+      batchCategoryFilter === "all"
+        ? true
+        : item.category === batchCategoryFilter,
+    )
     .map((item) => ({ id: item.id, name: item.name }));
-
-  const selectedBatchIds = Object.keys(batchSelected).filter((item) => batchSelected[item]);
-
-  const filteredTasks = useMemo(() => {
-    const source = dashboardQuery.data?.todayTasks ?? [];
-    const query = taskSearch.trim().toLowerCase();
-
-    return source.filter((task) => {
-      if (taskStatusFilter !== "all" && task.status !== taskStatusFilter) return false;
-      if (taskPriorityFilter !== "all" && task.priority !== taskPriorityFilter) return false;
-      if (!query) return true;
-
-      const haystack = `${task.title} ${task.description ?? ""} ${task.animal_name ?? ""}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [dashboardQuery.data?.todayTasks, taskPriorityFilter, taskSearch, taskStatusFilter]);
+  const selectedBatchIds = Object.keys(batchSelected).filter(
+    (item) => batchSelected[item],
+  );
 
   const onSaveExam = () => {
     if (!harasId || !examAnimalId) {
-      setMessage({ text: "Selecione a matriz para registrar o exame.", tone: "danger" });
+      setMessage({
+        text: "Selecione a matriz para registrar o exame.",
+        tone: "danger",
+      });
       return;
     }
     const right = parseOptionalNumber(follicleRight);
     const left = parseOptionalNumber(follicleLeft);
     if (right === null && left === null) {
-      setMessage({ text: "Informe pelo menos um folículo (OD ou OE).", tone: "danger" });
+      setMessage({
+        text: "Informe pelo menos um folículo (OD ou OE).",
+        tone: "danger",
+      });
       return;
     }
 
@@ -301,16 +344,23 @@ export function VeterinaryScreen() {
       },
       {
         onSuccess: (result) => {
-          setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
+          setMessage({
+            text: result.message,
+            tone: result.synced ? "success" : "warning",
+          });
           setExamModalOpen(false);
           setFollicleRight("");
           setFollicleLeft("");
           setExamNotes("");
         },
         onError: (error) => {
-          setMessage({ text: error instanceof Error ? error.message : "Falha ao salvar exame.", tone: "danger" });
+          setMessage({
+            text:
+              error instanceof Error ? error.message : "Falha ao salvar exame.",
+            tone: "danger",
+          });
         },
-      }
+      },
     );
   };
 
@@ -319,11 +369,16 @@ export function VeterinaryScreen() {
       setMessage({ text: "Selecione matriz e garanhão.", tone: "danger" });
       return;
     }
-
     const motility = parseOptionalNumber(motilityPercent);
     const paletas = Number(strawsUsed);
-    if (semenType === "Congelado" && (!Number.isFinite(paletas) || paletas <= 0)) {
-      setMessage({ text: "Informe a quantidade de paletas para sêmen congelado.", tone: "danger" });
+    if (
+      semenType === "Congelado" &&
+      (!Number.isFinite(paletas) || paletas <= 0)
+    ) {
+      setMessage({
+        text: "Informe a quantidade de paletas para sêmen congelado.",
+        tone: "danger",
+      });
       return;
     }
 
@@ -343,17 +398,23 @@ export function VeterinaryScreen() {
       },
       {
         onSuccess: (result) => {
-          setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
+          setMessage({
+            text: result.message,
+            tone: result.synced ? "success" : "warning",
+          });
           setInseminationModalOpen(false);
           setInseminationNotes("");
         },
         onError: (error) => {
           setMessage({
-            text: error instanceof Error ? error.message : "Falha ao registrar inseminação.",
+            text:
+              error instanceof Error
+                ? error.message
+                : "Falha ao registrar inseminação.",
             tone: "danger",
           });
         },
-      }
+      },
     );
   };
 
@@ -382,7 +443,10 @@ export function VeterinaryScreen() {
       },
       {
         onSuccess: (result) => {
-          setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
+          setMessage({
+            text: result.message,
+            tone: result.synced ? "success" : "warning",
+          });
           setBatchModalOpen(false);
           setBatchProcedureName("");
           setBatchNotes("");
@@ -391,21 +455,32 @@ export function VeterinaryScreen() {
           setBatchSelected({});
         },
         onError: (error) => {
-          setMessage({ text: error instanceof Error ? error.message : "Falha no manejo em lote.", tone: "danger" });
+          setMessage({
+            text:
+              error instanceof Error
+                ? error.message
+                : "Falha no manejo em lote.",
+            tone: "danger",
+          });
         },
-      }
+      },
     );
   };
 
   const onAddSemenEntry = () => {
     if (!harasId || !entryStallionId) {
-      setMessage({ text: "Selecione o garanhão para entrada de paletas.", tone: "danger" });
+      setMessage({
+        text: "Selecione o garanhão para entrada de paletas.",
+        tone: "danger",
+      });
       return;
     }
-
     const units = Number(entryUnits);
     if (!Number.isFinite(units) || units <= 0) {
-      setMessage({ text: "Informe quantidade válida de paletas.", tone: "danger" });
+      setMessage({
+        text: "Informe quantidade válida de paletas.",
+        tone: "danger",
+      });
       return;
     }
 
@@ -421,7 +496,10 @@ export function VeterinaryScreen() {
       },
       {
         onSuccess: (result) => {
-          setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
+          setMessage({
+            text: result.message,
+            tone: result.synced ? "success" : "warning",
+          });
           setSemenEntryModalOpen(false);
           setEntryUnits("1");
           setEntryReason("");
@@ -429,59 +507,31 @@ export function VeterinaryScreen() {
         },
         onError: (error) => {
           setMessage({
-            text: error instanceof Error ? error.message : "Falha ao registrar entrada de paletas.",
+            text:
+              error instanceof Error
+                ? error.message
+                : "Falha ao registrar entrada de paletas.",
             tone: "danger",
           });
         },
-      }
-    );
-  };
-
-  const onOpenLavageModal = (taskId: string) => {
-    setSelectedLavageTaskId(taskId);
-    setLavageOutcome("positivo");
-    setLavageAction("transferir");
-    setLavageRecipientId("");
-    setLavageNotes("");
-    setLavageModalOpen(true);
-  };
-
-  const onRegisterLavage = () => {
-    if (!harasId || !selectedLavageTaskId) return;
-    if (lavageOutcome === "positivo" && lavageAction === "transferir" && !lavageRecipientId) {
-      setMessage({ text: "Selecione a receptora para transferência.", tone: "danger" });
-      return;
-    }
-
-    registerLavageOutcomeMutation.mutate(
-      {
-        task_id: selectedLavageTaskId,
-        haras_id: harasId,
-        outcome: lavageOutcome,
-        action_when_positive: lavageOutcome === "positivo" ? lavageAction : undefined,
-        recipient_id: lavageOutcome === "positivo" && lavageAction === "transferir" ? lavageRecipientId : null,
-        notes: lavageNotes.trim() || null,
-        created_by: user?.id ?? null,
       },
-      {
-        onSuccess: (result) => {
-          setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
-          setLavageModalOpen(false);
-          setSelectedLavageTaskId("");
-        },
-        onError: (error) => {
-          setMessage({
-            text: error instanceof Error ? error.message : "Falha ao registrar resultado do lavado.",
-            tone: "danger",
-          });
-        },
-      }
     );
   };
 
   const onSaveTreatment = () => {
+    setTreatmentFormError(null);
+
     if (!harasId || !treatmentAnimalId || !treatmentType.trim()) {
-      setMessage({ text: "Informe animal e tipo de tratamento.", tone: "danger" });
+      setTreatmentFormError("Selecione o animal e informe o tipo de tratamento.");
+      setMessage({
+        text: "Informe animal e tipo de tratamento.",
+        tone: "danger",
+      });
+      return;
+    }
+
+    if (!treatmentDate.trim()) {
+      setTreatmentFormError("Informe a data do procedimento.");
       return;
     }
 
@@ -501,7 +551,11 @@ export function VeterinaryScreen() {
       },
       {
         onSuccess: (result) => {
-          setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
+          setTreatmentFormError(null);
+          setMessage({
+            text: result.message,
+            tone: result.synced ? "success" : "warning",
+          });
           setTreatmentModalOpen(false);
           setTreatmentType("");
           setTreatmentDescription("");
@@ -511,37 +565,42 @@ export function VeterinaryScreen() {
           setTreatmentNotes("");
         },
         onError: (error) => {
+          setTreatmentFormError(
+            error instanceof Error ? error.message : "Falha ao salvar tratamento.",
+          );
           setMessage({
-            text: error instanceof Error ? error.message : "Falha ao salvar tratamento.",
+            text:
+              error instanceof Error
+                ? error.message
+                : "Falha ao salvar tratamento.",
             tone: "danger",
           });
         },
-      }
+      },
     );
   };
 
   return (
     <AppScreen scroll>
       <View style={styles.header}>
-        <BrandLogo compact />
-        <Text style={[styles.title, { color: theme.colors.text }]}>Minha Rotina Hoje</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Módulo veterinário com coleta técnica e sync offline.</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>
+          Clínica Veterinária
+        </Text>
       </View>
 
       {message ? (
-        <Card style={styles.feedbackCard}>
+        <Card>
           <Text
-            style={[
-              styles.feedbackText,
-              {
-                color:
-                  message.tone === "success"
-                    ? theme.colors.success
-                    : message.tone === "warning"
+            style={{
+              color:
+                message.tone === "success"
+                  ? theme.colors.success
+                  : message.tone === "warning"
                     ? theme.colors.warning
                     : theme.colors.danger,
-              },
-            ]}
+              fontSize: 13,
+              fontWeight: "600",
+            }}
           >
             {message.text}
           </Text>
@@ -550,223 +609,230 @@ export function VeterinaryScreen() {
 
       <Card>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Sincronização Offline</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            Sincronização Offline
+          </Text>
           <Pressable
             onPress={() => flushQueueMutation.mutate()}
-            style={({ pressed }) => [styles.syncButton, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
+            style={({ pressed }) => [
+              styles.syncButton,
+              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+            ]}
           >
             <RefreshCw size={14} color={theme.colors.textMuted} />
-            <Text style={[styles.syncButtonText, { color: theme.colors.textMuted }]}>Sincronizar</Text>
+            <Text
+              style={[styles.syncButtonText, { color: theme.colors.textMuted }]}
+            >
+              Sincronizar
+            </Text>
           </Pressable>
         </View>
-
         <View style={styles.syncGrid}>
           <View style={[styles.syncBox, { borderColor: theme.colors.border }]}>
-            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}>Pendentes</Text>
+            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}>
+              Pendentes
+            </Text>
             <Text style={[styles.syncValue, { color: theme.colors.text }]}>
               {syncSnapshotQuery.data?.pending_count ?? 0}
             </Text>
           </View>
           <View style={[styles.syncBox, { borderColor: theme.colors.border }]}>
-            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}>Última sync</Text>
+            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}>
+              Última sync
+            </Text>
             <Text style={[styles.syncValueSmall, { color: theme.colors.text }]}>
               {syncSnapshotQuery.data?.last_sync_at
-                ? new Date(syncSnapshotQuery.data.last_sync_at).toLocaleString("pt-BR")
+                ? new Date(syncSnapshotQuery.data.last_sync_at).toLocaleString(
+                    "pt-BR",
+                  )
                 : "Ainda não sincronizado"}
             </Text>
           </View>
         </View>
+      </Card>
 
-        <Text
-          style={[
-            styles.syncFooter,
-            {
-              color:
-                syncSnapshotQuery.data?.last_sync_result === "error"
-                  ? theme.colors.danger
-                  : syncSnapshotQuery.data?.last_sync_result === "partial"
-                  ? theme.colors.warning
-                  : theme.colors.textMuted,
-            },
-          ]}
-        >
-          {syncSnapshotQuery.data?.last_sync_message || "Salvamentos offline aparecem aqui para acompanhamento."}
+      <Card>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          Painel rápido
         </Text>
-      </Card>
-
-      <View style={styles.kpiGrid}>
-        <QuickKpi label="Aguardando diagnóstico" value={String(dashboardQuery.data?.waitingDiagnosis ?? 0)} />
-        <QuickKpi label="Em tratamento" value={String(dashboardQuery.data?.inTreatment ?? 0)} />
-        <QuickKpi label="Ciclo reprodutivo" value={String(dashboardQuery.data?.reproductiveCycle ?? 0)} />
-      </View>
-
-      <Card>
-        <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Agenda do dia</Text>
-          <Pressable
-            onPress={() => flushQueueMutation.mutate()}
-            style={({ pressed }) => [styles.syncButton, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
-          >
-            <RefreshCw size={14} color={theme.colors.textMuted} />
-            <Text style={[styles.syncButtonText, { color: theme.colors.textMuted }]}>Sincronizar</Text>
-          </Pressable>
+        <View style={styles.kpiGrid}>
+          <QuickKpi
+            label="Animais no haras"
+            value={String(healthSummaryQuery.data?.totalAnimals ?? 0)}
+          />
+          <QuickKpi
+            label="Vacinação em dia"
+            value={String(healthSummaryQuery.data?.vaccinatedUpToDate ?? 0)}
+          />
+          <QuickKpi
+            label="Vacinas em atraso"
+            value={String(healthSummaryQuery.data?.vaccineOverdue ?? 0)}
+          />
+          <QuickKpi
+            label="Alertas ativos"
+            value={String(healthSummaryQuery.data?.activeAlerts ?? 0)}
+          />
+          <QuickKpi
+            label="Aguardando diagnóstico"
+            value={String(dashboardQuery.data?.waitingDiagnosis ?? 0)}
+          />
+          <QuickKpi
+            label="Em tratamento"
+            value={String(dashboardQuery.data?.inTreatment ?? 0)}
+          />
         </View>
-
-        <TextField
-          value={taskSearch}
-          onChangeText={setTaskSearch}
-          placeholder="Buscar por animal ou tarefa"
-        />
-
-        <View style={styles.filterRow}>
-          {(["all", "Pendente", "Concluído"] as const).map((value) => (
-            <Pressable
-              key={value}
-              onPress={() => setTaskStatusFilter(value)}
-              style={({ pressed }) => [
-                styles.filterChip,
-                {
-                  borderColor: taskStatusFilter === value ? theme.colors.primary : theme.colors.border,
-                  backgroundColor: taskStatusFilter === value ? theme.colors.surfaceAlt : "transparent",
-                  opacity: pressed ? 0.82 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.filterChipLabel, { color: theme.colors.text }]}>
-                {value === "all" ? "Status: todos" : value}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.filterRow}>
-          {(["all", "Alta", "Média", "Baixa"] as const).map((value) => (
-            <Pressable
-              key={value}
-              onPress={() => setTaskPriorityFilter(value)}
-              style={({ pressed }) => [
-                styles.filterChip,
-                {
-                  borderColor: taskPriorityFilter === value ? theme.colors.primary : theme.colors.border,
-                  backgroundColor: taskPriorityFilter === value ? theme.colors.surfaceAlt : "transparent",
-                  opacity: pressed ? 0.82 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.filterChipLabel, { color: theme.colors.text }]}> 
-                {value === "all" ? "Prioridade: todas" : value}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {dashboardQuery.isLoading ? (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Carregando tarefas...</Text>
-        ) : filteredTasks.length ? (
-          filteredTasks.map((task) => (
-            <View key={task.id} style={[styles.taskRow, { borderColor: theme.colors.border }]}> 
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={[styles.taskTitle, { color: theme.colors.text }]}>{task.title}</Text>
-                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]}> 
-                  {task.animal_name || "Animal não identificado"} • {formatDateBR(task.due_date)} • {task.priority}
-                </Text>
-                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]}> 
-                  Status: {task.status}
-                </Text>
-              </View>
-              <View style={styles.taskActions}>
-                {task.task_type === "lavado_d8" && task.status !== "Concluído" ? (
-                  <AppButton label="Resultado" onPress={() => onOpenLavageModal(task.id)} variant="ghost" />
-                ) : null}
-                {task.status !== "Concluído" ? (
-                  <AppButton
-                    label="Concluir"
-                    onPress={() => completeTaskMutation.mutate(task.id)}
-                    variant="ghost"
-                  />
-                ) : null}
-              </View>
-            </View>
-          ))
-        ) : (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Nenhuma tarefa pendente hoje.</Text>
-        )}
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Ações rápidas</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          Registrar procedimento clínico
+        </Text>
         <View style={styles.actionsGrid}>
           <Pressable
             onPress={() => setExamModalOpen(true)}
-            style={({ pressed }) => [styles.actionCard, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+            ]}
           >
             <Activity size={18} color={theme.colors.info} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Novo Exame</Text>
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+              Novo Exame
+            </Text>
           </Pressable>
-
           <Pressable
             onPress={() => setInseminationModalOpen(true)}
-            style={({ pressed }) => [styles.actionCard, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+            ]}
           >
             <ShieldPlus size={18} color={theme.colors.info} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Nova Inseminação</Text>
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+              Nova Inseminação
+            </Text>
           </Pressable>
-
           <Pressable
-            onPress={() => setBatchModalOpen(true)}
-            style={({ pressed }) => [styles.actionCard, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
-          >
-            <Syringe size={18} color={theme.colors.info} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Vacinação em lote</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setSemenEntryModalOpen(true)}
-            style={({ pressed }) => [styles.actionCard, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
-          >
-            <ShieldPlus size={18} color={theme.colors.warning} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Entrada de paletas</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setTreatmentModalOpen(true)}
-            style={({ pressed }) => [styles.actionCard, { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 }]}
+            onPress={() => {
+              setTreatmentFormError(null);
+              setTreatmentModalOpen(true);
+            }}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+            ]}
           >
             <Syringe size={18} color={theme.colors.warning} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>Novo Tratamento</Text>
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+              Novo Tratamento
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setBatchModalOpen(true)}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+            ]}
+          >
+            <Syringe size={18} color={theme.colors.info} />
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+              Vacinação em lote
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSemenEntryModalOpen(true)}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+            ]}
+          >
+            <ShieldPlus size={18} color={theme.colors.warning} />
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+              Entrada de paletas
+            </Text>
           </Pressable>
         </View>
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Estoque de sêmen por garanhão</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          Estoque de sêmen por garanhão
+        </Text>
         {semenQuery.isLoading ? (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Carregando estoque...</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
+            Carregando estoque...
+          </Text>
         ) : semenQuery.data?.length ? (
           semenQuery.data.map((item) => (
-            <View key={item.id} style={[styles.stockRow, { borderColor: theme.colors.border }]}> 
-              <Text style={[styles.stockName, { color: theme.colors.text }]}>{item.stallion_name}</Text>
-              <Text style={[styles.stockCount, { color: theme.colors.textMuted }]}>{item.available_paletas} paletas</Text>
+            <View
+              key={item.id}
+              style={[styles.stockRow, { borderColor: theme.colors.border }]}
+            >
+              <Text style={[styles.stockName, { color: theme.colors.text }]}>
+                {item.stallion_name}
+              </Text>
+              <Text
+                style={[styles.stockCount, { color: theme.colors.textMuted }]}
+              >
+                {item.available_paletas} paletas
+              </Text>
             </View>
           ))
         ) : (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Sem entradas de paletas registradas.</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
+            Sem entradas de paletas registradas.
+          </Text>
         )}
       </Card>
 
-      <Modal visible={examModalOpen} transparent animationType="slide" onRequestClose={() => setExamModalOpen(false)}>
+      <Modal
+        visible={examModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setExamModalOpen(false)}
+      >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setExamModalOpen(false)} />
-          <ScrollView
-            style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setExamModalOpen(false)}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={32}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
             contentContainerStyle={styles.modalContent}
           >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Registro de Exame Reprodutivo</Text>
-            <AnimalSelector title="Matriz" animals={females} selectedId={examAnimalId} onSelect={setExamAnimalId} />
-            <TextField label="Folículo OD (mm)" value={follicleRight} onChangeText={setFollicleRight} keyboardType="decimal-pad" />
-            <TextField label="Folículo OE (mm)" value={follicleLeft} onChangeText={setFollicleLeft} keyboardType="decimal-pad" />
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Edema uterino</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Registro de Exame Reprodutivo
+            </Text>
+            <AnimalSelector
+              title="Matriz"
+              animals={females}
+              selectedId={examAnimalId}
+              onSelect={setExamAnimalId}
+            />
+            <TextField
+              label="Folículo OD (mm)"
+              value={follicleRight}
+              onChangeText={setFollicleRight}
+              keyboardType="decimal-pad"
+            />
+            <TextField
+              label="Folículo OE (mm)"
+              value={follicleLeft}
+              onChangeText={setFollicleLeft}
+              keyboardType="decimal-pad"
+            />
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Edema uterino
+            </Text>
             <View style={styles.optionRow}>
               {EDEMA_OPTIONS.map((value) => (
                 <Pressable
@@ -775,8 +841,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: edema === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: edema === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        edema === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        edema === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -785,8 +857,9 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Cérvix</Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Cérvix
+            </Text>
             <View style={styles.optionRow}>
               {CERVIX_OPTIONS.map((value) => (
                 <Pressable
@@ -795,8 +868,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: cervix === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: cervix === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        cervix === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        cervix === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -805,16 +884,18 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
             <View style={styles.booleanRow}>
-              <AppButton label={liu ? "LIU: Sim" : "LIU: Não"} onPress={() => setLiu((prev) => !prev)} variant="ghost" />
+              <AppButton
+                label={liu ? "LIU: Sim" : "LIU: Não"}
+                onPress={() => setLiu((prev) => !prev)}
+                variant="ghost"
+              />
               <AppButton
                 label={induction ? "Indução: Sim" : "Indução: Não"}
                 onPress={() => setInduction((prev) => !prev)}
                 variant="ghost"
               />
             </View>
-
             {induction ? (
               <View style={styles.optionRow}>
                 {(["HCG", "Deslorelin"] as const).map((value) => (
@@ -824,8 +905,14 @@ export function VeterinaryScreen() {
                     style={({ pressed }) => [
                       styles.optionChip,
                       {
-                        borderColor: inductor === value ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: inductor === value ? theme.colors.surfaceAlt : "transparent",
+                        borderColor:
+                          inductor === value
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        backgroundColor:
+                          inductor === value
+                            ? theme.colors.surfaceAlt
+                            : "transparent",
                         opacity: pressed ? 0.82 : 1,
                       },
                     ]}
@@ -835,7 +922,6 @@ export function VeterinaryScreen() {
                 ))}
               </View>
             ) : null}
-
             <TextField
               label="Observações"
               value={examNotes}
@@ -843,12 +929,19 @@ export function VeterinaryScreen() {
               multiline
               style={styles.textArea}
             />
-
             <View style={styles.modalActions}>
-              <AppButton label="Cancelar" onPress={() => setExamModalOpen(false)} variant="ghost" />
-              <AppButton label="Salvar Exame" onPress={onSaveExam} loading={createExamMutation.isPending} />
+              <AppButton
+                label="Cancelar"
+                onPress={() => setExamModalOpen(false)}
+                variant="ghost"
+              />
+              <AppButton
+                label="Salvar Exame"
+                onPress={onSaveExam}
+                loading={createExamMutation.isPending}
+              />
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
 
@@ -859,17 +952,41 @@ export function VeterinaryScreen() {
         onRequestClose={() => setInseminationModalOpen(false)}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setInseminationModalOpen(false)} />
-          <ScrollView
-            style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setInseminationModalOpen(false)}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={32}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
             contentContainerStyle={styles.modalContent}
           >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Registro de Inseminação</Text>
-
-            <AnimalSelector title="Matriz" animals={females} selectedId={mareId} onSelect={setMareId} />
-            <AnimalSelector title="Garanhão" animals={stallions} selectedId={stallionId} onSelect={setStallionId} />
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Método</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Registro de Inseminação
+            </Text>
+            <AnimalSelector
+              title="Matriz"
+              animals={females}
+              selectedId={mareId}
+              onSelect={setMareId}
+            />
+            <AnimalSelector
+              title="Garanhão"
+              animals={stallions}
+              selectedId={stallionId}
+              onSelect={setStallionId}
+            />
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Método
+            </Text>
             <View style={styles.optionRow}>
               {(["IA", "Monta", "Transfer"] as const).map((value) => (
                 <Pressable
@@ -878,8 +995,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: method === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: method === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        method === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        method === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -888,8 +1011,9 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Tipo de sêmen</Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Tipo de sêmen
+            </Text>
             <View style={styles.optionRow}>
               {(["Fresco", "Resfriado", "Congelado"] as const).map((value) => (
                 <Pressable
@@ -898,8 +1022,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: semenType === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: semenType === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        semenType === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        semenType === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -908,8 +1038,9 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Qualidade</Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Qualidade
+            </Text>
             <View style={styles.optionRow}>
               {(["Ótima", "Boa", "Regular", "Ruim"] as const).map((value) => (
                 <Pressable
@@ -918,8 +1049,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: motilityQuality === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: motilityQuality === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        motilityQuality === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        motilityQuality === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -928,7 +1065,6 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
             <TextField
               label="Motilidade (%)"
               value={motilityPercent}
@@ -948,29 +1084,52 @@ export function VeterinaryScreen() {
               multiline
               style={styles.textArea}
             />
-
             <View style={styles.modalActions}>
-              <AppButton label="Cancelar" onPress={() => setInseminationModalOpen(false)} variant="ghost" />
+              <AppButton
+                label="Cancelar"
+                onPress={() => setInseminationModalOpen(false)}
+                variant="ghost"
+              />
               <AppButton
                 label="Confirmar Inseminação"
                 onPress={onSaveBreeding}
                 loading={createBreedingMutation.isPending}
               />
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
 
-      <Modal visible={batchModalOpen} transparent animationType="slide" onRequestClose={() => setBatchModalOpen(false)}>
+      <Modal
+        visible={batchModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setBatchModalOpen(false)}
+      >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setBatchModalOpen(false)} />
-          <ScrollView
-            style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setBatchModalOpen(false)}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={32}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
             contentContainerStyle={styles.modalContent}
           >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Manejo Sanitário em Lote</Text>
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Procedimento</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Manejo Sanitário em Lote
+            </Text>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Procedimento
+            </Text>
             <View style={styles.optionRow}>
               {(["Vacina", "Vermífugo"] as const).map((value) => (
                 <Pressable
@@ -979,8 +1138,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: batchProcedureType === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: batchProcedureType === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        batchProcedureType === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        batchProcedureType === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -989,51 +1154,85 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
-            <TextField label="Nome do procedimento" value={batchProcedureName} onChangeText={setBatchProcedureName} />
-            <TextField label="Data" value={batchDate} onChangeText={setBatchDate} placeholder="YYYY-MM-DD" />
-            <TextField label="Lote" value={batchLot} onChangeText={setBatchLot} />
             <TextField
-              label="Validade"
-              value={batchExpiration}
-              onChangeText={setBatchExpiration}
-              placeholder="YYYY-MM-DD"
+              label="Nome do procedimento"
+              value={batchProcedureName}
+              onChangeText={setBatchProcedureName}
             />
-            <TextField label="Observações" value={batchNotes} onChangeText={setBatchNotes} multiline style={styles.textArea} />
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Filtro por categoria</Text>
+            <DateField label="Data" value={batchDate} onChange={setBatchDate} />
+            <TextField
+              label="Lote"
+              value={batchLot}
+              onChangeText={setBatchLot}
+            />
+            <DateField label="Validade" value={batchExpiration} onChange={setBatchExpiration} />
+            <TextField
+              label="Observações"
+              value={batchNotes}
+              onChangeText={setBatchNotes}
+              multiline
+              style={styles.textArea}
+            />
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Filtro por categoria
+            </Text>
             <View style={styles.optionRow}>
-              {(["all", "egua", "garanhao", "potro", "potra", "castrado"] as const).map((value) => (
+              {(
+                [
+                  "all",
+                  "egua",
+                  "garanhao",
+                  "potro",
+                  "potra",
+                  "castrado",
+                ] as const
+              ).map((value) => (
                 <Pressable
                   key={value}
                   onPress={() => setBatchCategoryFilter(value)}
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: batchCategoryFilter === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: batchCategoryFilter === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        batchCategoryFilter === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        batchCategoryFilter === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
                 >
-                  <Text style={{ color: theme.colors.text }}>{value === "all" ? "Todos" : value}</Text>
+                  <Text style={{ color: theme.colors.text }}>
+                    {value === "all" ? "Todos" : value}
+                  </Text>
                 </Pressable>
               ))}
             </View>
-
             <AnimalSelector
               title={`Selecionar animais (${selectedBatchIds.length})`}
               animals={allAnimals}
               selectedId=""
               isSelected={(id) => Boolean(batchSelected[id])}
-              onSelect={(id) => setBatchSelected((prev) => ({ ...prev, [id]: !prev[id] }))}
+              onSelect={(id) =>
+                setBatchSelected((prev) => ({ ...prev, [id]: !prev[id] }))
+              }
             />
-
             <View style={styles.modalActions}>
-              <AppButton label="Cancelar" onPress={() => setBatchModalOpen(false)} variant="ghost" />
-              <AppButton label="Confirmar Lote" onPress={onSaveBatch} loading={createBatchMutation.isPending} />
+              <AppButton
+                label="Cancelar"
+                onPress={() => setBatchModalOpen(false)}
+                variant="ghost"
+              />
+              <AppButton
+                label="Confirmar Lote"
+                onPress={onSaveBatch}
+                loading={createBatchMutation.isPending}
+              />
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
 
@@ -1044,17 +1243,41 @@ export function VeterinaryScreen() {
         onRequestClose={() => setSemenEntryModalOpen(false)}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setSemenEntryModalOpen(false)} />
-          <ScrollView
-            style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setSemenEntryModalOpen(false)}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={32}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
             contentContainerStyle={styles.modalContent}
           >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Entrada de paletas</Text>
-
-            <AnimalSelector title="Garanhão" animals={stallions} selectedId={entryStallionId} onSelect={setEntryStallionId} />
-            <TextField label="Quantidade de paletas" value={entryUnits} onChangeText={setEntryUnits} keyboardType="number-pad" />
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Tipo de sêmen</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Entrada de paletas
+            </Text>
+            <AnimalSelector
+              title="Garanhão"
+              animals={stallions}
+              selectedId={entryStallionId}
+              onSelect={setEntryStallionId}
+            />
+            <TextField
+              label="Quantidade de paletas"
+              value={entryUnits}
+              onChangeText={setEntryUnits}
+              keyboardType="number-pad"
+            />
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
+              Tipo de sêmen
+            </Text>
             <View style={styles.optionRow}>
               {(["Fresco", "Resfriado", "Congelado"] as const).map((value) => (
                 <Pressable
@@ -1063,8 +1286,14 @@ export function VeterinaryScreen() {
                   style={({ pressed }) => [
                     styles.optionChip,
                     {
-                      borderColor: entrySemenType === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: entrySemenType === value ? theme.colors.surfaceAlt : "transparent",
+                      borderColor:
+                        entrySemenType === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        entrySemenType === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
                       opacity: pressed ? 0.82 : 1,
                     },
                   ]}
@@ -1073,97 +1302,32 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-
-            <TextField label="Motivo" value={entryReason} onChangeText={setEntryReason} placeholder="Compra, reposição, transferência" />
-            <TextField label="Observações" value={entryNotes} onChangeText={setEntryNotes} multiline style={styles.textArea} />
-
-            <View style={styles.modalActions}>
-              <AppButton label="Cancelar" onPress={() => setSemenEntryModalOpen(false)} variant="ghost" />
-              <AppButton label="Registrar Entrada" onPress={onAddSemenEntry} loading={addSemenMutation.isPending} />
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      <Modal visible={lavageModalOpen} transparent animationType="slide" onRequestClose={() => setLavageModalOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setLavageModalOpen(false)} />
-          <ScrollView
-            style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-            contentContainerStyle={styles.modalContent}
-          >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Resultado do Lavado D8</Text>
-
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Resultado</Text>
-            <View style={styles.optionRow}>
-              {(["positivo", "negativo"] as const).map((value) => (
-                <Pressable
-                  key={value}
-                  onPress={() => setLavageOutcome(value)}
-                  style={({ pressed }) => [
-                    styles.optionChip,
-                    {
-                      borderColor: lavageOutcome === value ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: lavageOutcome === value ? theme.colors.surfaceAlt : "transparent",
-                      opacity: pressed ? 0.82 : 1,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: theme.colors.text }}>{value === "positivo" ? "Positivo" : "Negativo"}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {lavageOutcome === "positivo" ? (
-              <>
-                <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Ação para embrião</Text>
-                <View style={styles.optionRow}>
-                  {(["transferir", "congelar"] as const).map((value) => (
-                    <Pressable
-                      key={value}
-                      onPress={() => setLavageAction(value)}
-                      style={({ pressed }) => [
-                        styles.optionChip,
-                        {
-                          borderColor: lavageAction === value ? theme.colors.primary : theme.colors.border,
-                          backgroundColor: lavageAction === value ? theme.colors.surfaceAlt : "transparent",
-                          opacity: pressed ? 0.82 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={{ color: theme.colors.text }}>{value === "transferir" ? "Transferir" : "Congelar"}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                {lavageAction === "transferir" ? (
-                  <AnimalSelector
-                    title="Receptora"
-                    animals={females}
-                    selectedId={lavageRecipientId}
-                    onSelect={setLavageRecipientId}
-                  />
-                ) : null}
-              </>
-            ) : null}
-
+            <TextField
+              label="Motivo"
+              value={entryReason}
+              onChangeText={setEntryReason}
+              placeholder="Compra, reposição, transferência"
+            />
             <TextField
               label="Observações"
-              value={lavageNotes}
-              onChangeText={setLavageNotes}
+              value={entryNotes}
+              onChangeText={setEntryNotes}
               multiline
               style={styles.textArea}
             />
-
             <View style={styles.modalActions}>
-              <AppButton label="Cancelar" onPress={() => setLavageModalOpen(false)} variant="ghost" />
               <AppButton
-                label="Registrar Resultado"
-                onPress={onRegisterLavage}
-                loading={registerLavageOutcomeMutation.isPending}
+                label="Cancelar"
+                onPress={() => setSemenEntryModalOpen(false)}
+                variant="ghost"
+              />
+              <AppButton
+                label="Registrar Entrada"
+                onPress={onAddSemenEntry}
+                loading={addSemenMutation.isPending}
               />
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
 
@@ -1171,30 +1335,99 @@ export function VeterinaryScreen() {
         visible={treatmentModalOpen}
         transparent
         animationType="slide"
-        onRequestClose={() => setTreatmentModalOpen(false)}
+        onRequestClose={() => {
+          setTreatmentFormError(null);
+          setTreatmentModalOpen(false);
+        }}
       >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setTreatmentModalOpen(false)} />
-          <ScrollView
-            style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setTreatmentFormError(null);
+              setTreatmentModalOpen(false);
+            }}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={32}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
             contentContainerStyle={styles.modalContent}
           >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Novo Tratamento</Text>
-
-            <AnimalSelector title="Animal" animals={allAnimalsSource.map((item) => ({ id: item.id, name: item.name }))} selectedId={treatmentAnimalId} onSelect={setTreatmentAnimalId} />
-            <TextField label="Tipo" value={treatmentType} onChangeText={setTreatmentType} placeholder="Ex: Antibiótico, anti-inflamatório" />
-            <TextField label="Data" value={treatmentDate} onChangeText={setTreatmentDate} placeholder="YYYY-MM-DD" />
-            <TextField label="Próxima data" value={treatmentNextDate} onChangeText={setTreatmentNextDate} placeholder="YYYY-MM-DD" />
-            <TextField label="Descrição" value={treatmentDescription} onChangeText={setTreatmentDescription} />
-            <TextField label="Medicamento" value={treatmentMedication} onChangeText={setTreatmentMedication} />
-            <TextField label="Dosagem" value={treatmentDosage} onChangeText={setTreatmentDosage} />
-            <TextField label="Observações" value={treatmentNotes} onChangeText={setTreatmentNotes} multiline style={styles.textArea} />
-
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Novo Tratamento
+            </Text>
+            <AnimalSelector
+              title="Animal"
+              animals={allAnimalsSource.map((item) => ({
+                id: item.id,
+                name: item.name,
+              }))}
+              selectedId={treatmentAnimalId}
+              onSelect={setTreatmentAnimalId}
+            />
+            <TextField
+              label="Tipo"
+              value={treatmentType}
+              onChangeText={setTreatmentType}
+              placeholder="Ex: Antibiótico, anti-inflamatório"
+            />
+            <DateField label="Data" value={treatmentDate} onChange={setTreatmentDate} />
+            <DateField
+              label="Próxima data"
+              value={treatmentNextDate}
+              onChange={setTreatmentNextDate}
+            />
+            <TextField
+              label="Descrição"
+              value={treatmentDescription}
+              onChangeText={setTreatmentDescription}
+            />
+            <TextField
+              label="Medicamento"
+              value={treatmentMedication}
+              onChangeText={setTreatmentMedication}
+            />
+            <TextField
+              label="Dosagem"
+              value={treatmentDosage}
+              onChangeText={setTreatmentDosage}
+            />
+            <TextField
+              label="Observações"
+              value={treatmentNotes}
+              onChangeText={setTreatmentNotes}
+              multiline
+              style={styles.textArea}
+            />
+            {treatmentFormError ? (
+              <Text style={{ color: theme.colors.danger, fontSize: 13, fontWeight: "600" }}>
+                {treatmentFormError}
+              </Text>
+            ) : null}
             <View style={styles.modalActions}>
-              <AppButton label="Cancelar" onPress={() => setTreatmentModalOpen(false)} variant="ghost" />
-              <AppButton label="Salvar Tratamento" onPress={onSaveTreatment} loading={createTreatmentMutation.isPending} />
+              <AppButton
+                label="Cancelar"
+                onPress={() => {
+                  setTreatmentFormError(null);
+                  setTreatmentModalOpen(false);
+                }}
+                variant="ghost"
+              />
+              <AppButton
+                label="Salvar Tratamento"
+                onPress={onSaveTreatment}
+                loading={createTreatmentMutation.isPending}
+              />
             </View>
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
     </AppScreen>
@@ -1202,86 +1435,29 @@ export function VeterinaryScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  header: {
-    gap: 6,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  feedbackCard: {
-    marginTop: 2,
-  },
-  feedbackText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  syncGrid: {
+  centered: { flex: 1, justifyContent: "center" },
+  header: { gap: 2 },
+  title: { fontSize: 24, fontWeight: "700" },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  kpiCard: { width: "48%", minHeight: 82, justifyContent: "center", gap: 6 },
+  kpiLabel: { fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4 },
+  kpiValue: { fontSize: 24, fontWeight: "700" },
+  cardHeader: {
     flexDirection: "row",
-    gap: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  syncBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 4,
-  },
+  cardTitle: { fontSize: 15, fontWeight: "700" },
+  syncGrid: { flexDirection: "row", gap: 10 },
+  syncBox: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 10, gap: 4 },
   syncLabel: {
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 0.4,
     fontWeight: "700",
   },
-  syncValue: {
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  syncValueSmall: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  syncFooter: {
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  kpiGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  kpiCard: {
-    width: "48%",
-    minHeight: 82,
-    justifyContent: "center",
-    gap: 6,
-  },
-  kpiLabel: {
-    fontSize: 12,
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  kpiValue: {
-    fontSize: 24,
-    fontWeight: "700",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-  },
+  syncValue: { fontSize: 22, fontWeight: "700" },
+  syncValueSmall: { fontSize: 12, fontWeight: "600" },
   syncButton: {
     borderWidth: 1,
     borderRadius: 10,
@@ -1291,54 +1467,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
   },
-  syncButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  emptyText: {
-    fontSize: 13,
-  },
-  filterRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  filterChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    minHeight: 32,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterChipLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  taskRow: {
-    borderBottomWidth: 1,
-    paddingBottom: 10,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  taskTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  taskMeta: {
-    fontSize: 12,
-  },
-  taskActions: {
-    gap: 8,
-    minWidth: 110,
-  },
-  actionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
+  syncButtonText: { fontSize: 12, fontWeight: "600" },
+  actionsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   actionCard: {
     width: "48%",
     minHeight: 80,
@@ -1348,10 +1478,8 @@ const styles = StyleSheet.create({
     gap: 8,
     justifyContent: "center",
   },
-  actionTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  actionTitle: { fontSize: 13, fontWeight: "700" },
+  emptyText: { fontSize: 13 },
   stockRow: {
     borderBottomWidth: 1,
     paddingBottom: 8,
@@ -1360,18 +1488,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  stockName: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  stockCount: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
+  stockName: { fontSize: 14, fontWeight: "600" },
+  stockCount: { fontSize: 13, fontWeight: "600" },
+  modalRoot: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.55)",
@@ -1382,22 +1501,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     maxHeight: "90%",
   },
-  modalContent: {
-    padding: 16,
-    gap: 10,
-    paddingBottom: 28,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  selectorBlock: {
-    gap: 8,
-  },
-  selectorTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  modalContent: { padding: 16, gap: 10, paddingBottom: 28 },
+  modalTitle: { fontSize: 17, fontWeight: "700" },
+  selectorBlock: { gap: 8 },
+  selectorTitle: { fontSize: 14, fontWeight: "600" },
   selectorList: {
     borderWidth: 1,
     borderRadius: 12,
@@ -1405,9 +1512,7 @@ const styles = StyleSheet.create({
     maxHeight: 220,
     padding: 8,
   },
-  selectorScroll: {
-    flex: 1,
-  },
+  selectorScroll: { flex: 1 },
   selectorItem: {
     borderWidth: 1,
     borderRadius: 10,
@@ -1415,19 +1520,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 8,
   },
-  selectorItemLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  optionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  selectorItemLabel: { fontSize: 13, fontWeight: "600" },
+  inputLabel: { fontSize: 13, fontWeight: "600" },
+  optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionChip: {
     borderWidth: 1,
     borderRadius: 999,
@@ -1436,13 +1531,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  booleanRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  textArea: {
-    minHeight: 120,
-  },
+  booleanRow: { flexDirection: "row", gap: 8 },
+  textArea: { minHeight: 120 },
   modalActions: {
     flexDirection: "column",
     gap: 8,

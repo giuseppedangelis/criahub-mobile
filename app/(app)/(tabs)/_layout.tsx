@@ -2,6 +2,7 @@ import { Redirect, Tabs } from "expo-router";
 import {
   AlertTriangle,
   CalendarDays,
+  ClipboardList,
   Heart,
   Home,
   List,
@@ -63,8 +64,15 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="veterinaria"
           options={{
-            title: "Veterinária",
+            title: "Clínica",
             tabBarIcon: ({ color, size }) => <Stethoscope color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="rotina"
+          options={{
+            title: "Rotina",
+            tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -122,6 +130,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="agenda" options={{ href: null }} />
         <Tabs.Screen name="reproducao" options={{ href: null }} />
         <Tabs.Screen name="veterinaria" options={{ href: null }} />
+        <Tabs.Screen name="rotina" options={{ href: null }} />
       </Tabs>
     );
   }
@@ -141,6 +150,14 @@ export default function TabsLayout() {
           title: "Agenda",
           href: isCreator ? undefined : null,
           tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="rotina"
+        options={{
+          title: "Rotina",
+          href: isCreator ? undefined : null,
+          tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
         }}
       />
       <Tabs.Screen

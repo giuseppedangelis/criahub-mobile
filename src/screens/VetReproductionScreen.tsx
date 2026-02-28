@@ -1,16 +1,45 @@
-import { Activity, Baby, HeartPulse } from "lucide-react-native";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { useState } from "react";
+import { Activity, Baby, Plus } from "lucide-react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { AppButton } from "@/src/components/ui/AppButton";
 import { AppScreen } from "@/src/components/ui/AppScreen";
-import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
+import { DateField } from "@/src/components/ui/DateField";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useReproductionOverviewQuery } from "@/src/hooks/useReproduction";
+import { useAnimalsQuery } from "@/src/hooks/useAnimals";
+import {
+  useCreateGestationMutation,
+  useCreateReproductiveEventMutation,
+  useGestationsQuery,
+  useReproductionStatsQuery,
+  useReproductiveEventsQuery,
+  useUpdateGestationStatusMutation,
+} from "@/src/hooks/useReproduction";
 import { isVeterinaryRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import { formatDateBR } from "@/src/utils/format";
-import type { GestationItem, ReproductionEventItem } from "@/src/types/domain";
+
+const EVENT_TYPE_OPTIONS = [
+  { value: "cobertura", label: "Cobertura" },
+  { value: "inseminacao", label: "Inseminação" },
+  { value: "coleta_ovulos", label: "Coleta de Óvulos" },
+  { value: "transferencia_embriao", label: "Transferência" },
+  { value: "diagnostico_gestacao", label: "Diagnóstico" },
+  { value: "parto", label: "Parto" },
+] as const;
+
+const EVENT_STATUS_OPTIONS = ["Pendente", "Confirmado", "Concluído"] as const;
+
+const GESTATION_STATUS_OPTIONS = [
+  { value: "em_andamento", label: "Em andamento" },
+  { value: "confirmada", label: "Confirmada" },
+  { value: "nascimento", label: "Nascimento" },
+  { value: "aborto", label: "Aborto" },
+  { value: "reabsorvida", label: "Reabsorvida" },
+] as const;
 
 function normalizeEventType(value: string) {
   const map: Record<string, string> = {
@@ -24,18 +53,202 @@ function normalizeEventType(value: string) {
   return map[value] || value;
 }
 
-export function VetReproductionScreen() {
-  const { role, harasId } = useAuth();
+function normalizeEventStatus(value: string | null | undefined) {
+  const normalized = (value || "").toLowerCase();
+  if (normalized.includes("concl")) return "concluido";
+  if (normalized.includes("confirm")) return "confirmado";
+  if (normalized.includes("andamento")) return "confirmado";
+  return "pendente";
+}
+
+function normalizeGestationStatus(value: string | null | undefined) {
+  const normalized = (value || "").toLowerCase();
+  if (normalized.includes("nasc") || normalized.includes("parto")) {
+    return "nascimento";
+  }
+  if (normalized.includes("abort")) return "aborto";
+  if (normalized.includes("reabsor")) return "reabsorvida";
+  if (normalized.includes("confirm")) return "confirmada";
+  return "em_andamento";
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function inferMareName(item: {
+  mare_name: string | null;
+  animal_name: string | null;
+}) {
+  return item.mare_name || item.animal_name;
+}
+
+function AnimalPicker({
+  title,
+  animals,
+  selectedId,
+  onSelect,
+}: {
+  title: string;
+  animals: { id: string; name: string }[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
   const { theme } = useAppTheme();
-  const { data, isLoading, error } = useReproductionOverviewQuery(harasId);
-  const [selectedEvent, setSelectedEvent] = useState<ReproductionEventItem | null>(null);
-  const [selectedGestation, setSelectedGestation] = useState<GestationItem | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const text = search.trim().toLowerCase();
+    if (!text) return animals;
+    return animals.filter((item) => item.name.toLowerCase().includes(text));
+  }, [animals, search]);
+
+  return (
+    <View style={styles.selectorBlock}>
+      <Text style={[styles.inputLabel, { color: theme.colors.text }]}>{title}</Text>
+      <TextField
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Buscar por nome"
+      />
+      <View style={[styles.selectorList, { borderColor: theme.colors.border }]}>
+        <ScrollView nestedScrollEnabled style={styles.selectorScroll}>
+          {filtered.slice(0, 35).map((item) => {
+            const active = selectedId === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => onSelect(item.id)}
+                style={({ pressed }) => [
+                  styles.selectorItem,
+                  {
+                    borderColor: active ? theme.colors.primary : theme.colors.border,
+                    backgroundColor: active ? theme.colors.surfaceAlt : "transparent",
+                    opacity: pressed ? 0.86 : 1,
+                  },
+                ]}
+              >
+                <Text style={{ color: theme.colors.text }}>{item.name}</Text>
+              </Pressable>
+            );
+          })}
+          {filtered.length === 0 ? (
+            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Nenhum animal encontrado.</Text>
+          ) : null}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+export function VetReproductionScreen() {
+  const { role, harasId, profile } = useAuth();
+  const { theme } = useAppTheme();
+
+  const eventsQuery = useReproductiveEventsQuery(harasId);
+  const gestationsQuery = useGestationsQuery(harasId);
+  const statsQuery = useReproductionStatsQuery(harasId);
+  const createEventMutation = useCreateReproductiveEventMutation();
+  const createGestationMutation = useCreateGestationMutation();
+  const updateGestationStatusMutation = useUpdateGestationStatusMutation();
+  const maresQuery = useAnimalsQuery(
+    { haras_id: harasId ?? undefined, sex: "Fêmea", status: "ativo" },
+    { page: 1, limit: 200 },
+    isVeterinaryRole(role),
+  );
+  const stallionsQuery = useAnimalsQuery(
+    { haras_id: harasId ?? undefined, sex: "Macho", status: "ativo" },
+    { page: 1, limit: 200 },
+    isVeterinaryRole(role),
+  );
+
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [gestationModalOpen, setGestationModalOpen] = useState(false);
+  const [statusModal, setStatusModal] = useState<{
+    id: string;
+  } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    tone: "success" | "danger";
+  } | null>(null);
+
+  const [eventType, setEventType] = useState("inseminacao");
+  const [eventFilter, setEventFilter] = useState<
+    "all" | "pendente" | "confirmado" | "concluido"
+  >("all");
+  const [eventDate, setEventDate] = useState(todayIsoDate());
+  const [eventMareId, setEventMareId] = useState("");
+  const [eventStallionId, setEventStallionId] = useState("");
+  const [eventStatus, setEventStatus] = useState("Pendente");
+  const [eventNotes, setEventNotes] = useState("");
+
+  const [gestationMareId, setGestationMareId] = useState("");
+  const [gestationFilter, setGestationFilter] = useState<
+    "all" | "em_andamento" | "confirmada" | "nascimento" | "aborto"
+  >("all");
+  const [gestationStallionId, setGestationStallionId] = useState("");
+  const [gestationStartDate, setGestationStartDate] = useState(todayIsoDate());
+  const [gestationConfirmDate, setGestationConfirmDate] =
+    useState(todayIsoDate());
+  const [gestationExpectedBirth, setGestationExpectedBirth] = useState("");
+  const [gestationStatus, setGestationStatus] = useState("em_andamento");
+  const [gestationNotes, setGestationNotes] = useState("");
+
+  const mares = useMemo(
+    () =>
+      (maresQuery.data?.data ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+      })),
+    [maresQuery.data?.data],
+  );
+  const stallions = useMemo(
+    () =>
+      (stallionsQuery.data?.data ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+      })),
+    [stallionsQuery.data?.data],
+  );
+  const selectedEventMareName =
+    mares.find((item) => item.id === eventMareId)?.name || "Nenhuma égua selecionada";
+  const selectedEventStallionName =
+    stallions.find((item) => item.id === eventStallionId)?.name ||
+    "Sem garanhão vinculado";
+  const selectedGestationMareName =
+    mares.find((item) => item.id === gestationMareId)?.name ||
+    "Nenhuma égua selecionada";
+  const selectedGestationStallionName =
+    stallions.find((item) => item.id === gestationStallionId)?.name ||
+    "Sem garanhão vinculado";
+
+  const resetEventForm = () => {
+    setEventType("inseminacao");
+    setEventDate(todayIsoDate());
+    setEventMareId("");
+    setEventStallionId("");
+    setEventStatus("Pendente");
+    setEventNotes("");
+  };
+
+  const resetGestationForm = () => {
+    setGestationMareId("");
+    setGestationStallionId("");
+    setGestationStartDate(todayIsoDate());
+    setGestationConfirmDate(todayIsoDate());
+    setGestationExpectedBirth("");
+    setGestationStatus("em_andamento");
+    setGestationNotes("");
+  };
 
   if (!isVeterinaryRole(role)) {
     return (
       <AppScreen>
         <View style={styles.centered}>
-          <EmptyState title="Reprodução Veterinária" description="Disponível apenas para perfil Veterinária." />
+          <EmptyState
+            title="Reprodução Veterinária"
+            description="Disponível apenas para perfil Veterinária."
+          />
         </View>
       </AppScreen>
     );
@@ -54,133 +267,655 @@ export function VetReproductionScreen() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <AppScreen>
-        <View style={styles.centered}>
-          <Text style={[styles.loading, { color: theme.colors.textMuted }]}>Carregando reprodução clínica...</Text>
-        </View>
-      </AppScreen>
+  const events = eventsQuery.data ?? [];
+  const gestations = gestationsQuery.data ?? [];
+  const stats = statsQuery.data;
+  const filteredEvents = useMemo(() => {
+    if (eventFilter === "all") return events;
+    return events.filter(
+      (item) => normalizeEventStatus(item.status) === eventFilter,
     );
-  }
-
-  if (error) {
-    return (
-      <AppScreen>
-        <View style={styles.centered}>
-          <EmptyState
-            title="Falha na reprodução"
-            description={error instanceof Error ? error.message : "Não foi possível carregar dados."}
-          />
-        </View>
-      </AppScreen>
+  }, [eventFilter, events]);
+  const filteredGestations = useMemo(() => {
+    if (gestationFilter === "all") return gestations;
+    return gestations.filter(
+      (item) => normalizeGestationStatus(item.status) === gestationFilter,
     );
-  }
-
-  const events = data?.events ?? [];
-  const gestations = data?.gestations ?? [];
+  }, [gestationFilter, gestations]);
 
   return (
     <AppScreen scroll>
-      <View style={styles.header}>
-        <BrandLogo compact />
-        <Text style={[styles.title, { color: theme.colors.text }]}>Reprodução Clínica</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Painel técnico para decisão veterinária no manejo reprodutivo.</Text>
-      </View>
+      {message ? (
+        <Card>
+          <Text
+            style={{
+              color:
+                message.tone === "success"
+                  ? theme.colors.success
+                  : theme.colors.danger,
+              fontWeight: "600",
+            }}
+          >
+            {message.text}
+          </Text>
+        </Card>
+      ) : null}
 
       <View style={styles.summaryGrid}>
         <Card style={styles.summaryCard}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Eventos técnicos</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{events.length}</Text>
+          <Text
+            style={[styles.summaryLabel, { color: theme.colors.textMuted }]}
+          >
+            Eventos
+          </Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+            {stats?.total_events ?? events.length}
+          </Text>
         </Card>
         <Card style={styles.summaryCard}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Gestações</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{gestations.length}</Text>
+          <Text
+            style={[styles.summaryLabel, { color: theme.colors.textMuted }]}
+          >
+            Gestações
+          </Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+            {stats?.total_gestations ?? gestations.length}
+          </Text>
+        </Card>
+        <Card style={styles.summaryCard}>
+          <Text
+            style={[styles.summaryLabel, { color: theme.colors.textMuted }]}
+          >
+            Ativas
+          </Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+            {stats?.active_gestations ?? 0}
+          </Text>
         </Card>
       </View>
 
       <Card>
         <View style={styles.row}>
-          <Activity size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Últimos Procedimentos</Text>
+          <Plus size={18} color={theme.colors.primary} />
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            Novo registro reprodutivo
+          </Text>
         </View>
-        {events.length ? (
-          events.slice(0, 10).map((item) => (
+        <View style={styles.actionGrid}>
+          <AppButton
+            label="Novo evento"
+            onPress={() => setEventModalOpen(true)}
+          />
+          <AppButton
+            label="Nova gestação"
+            variant="ghost"
+            onPress={() => setGestationModalOpen(true)}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.row}>
+          <Activity size={18} color={theme.colors.text} />
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            Eventos Reprodutivos
+          </Text>
+        </View>
+        <View style={styles.filterRow}>
+          {([
+            { id: "all", label: "Todos" },
+            { id: "pendente", label: "Pendentes" },
+            { id: "confirmado", label: "Confirmados" },
+            { id: "concluido", label: "Concluídos" },
+          ] as const).map((item) => (
             <Pressable
               key={item.id}
-              onPress={() => setSelectedEvent(item)}
+              onPress={() => setEventFilter(item.id)}
               style={({ pressed }) => [
-                styles.listRow,
-                { borderColor: theme.colors.border, opacity: pressed ? 0.78 : 1 },
+                styles.filterChip,
+                {
+                  borderColor:
+                    eventFilter === item.id
+                      ? theme.colors.primary
+                      : theme.colors.border,
+                  backgroundColor:
+                    eventFilter === item.id
+                      ? theme.colors.surfaceAlt
+                      : "transparent",
+                  opacity: pressed ? 0.82 : 1,
+                },
               ]}
             >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{normalizeEventType(item.event_type)}</Text>
-                <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>Data: {formatDateBR(item.event_date)}</Text>
-              </View>
-              <Text style={[styles.rowStatus, { color: theme.colors.textMuted }]}>{item.status || "-"}</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 12 }}>
+                {item.label}
+              </Text>
             </Pressable>
+          ))}
+        </View>
+        {eventsQuery.isLoading ? (
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Carregando eventos...</Text>
+        ) : eventsQuery.error ? (
+          <Text style={[styles.emptyText, { color: theme.colors.danger }]}>Não foi possível carregar eventos.</Text>
+        ) : filteredEvents.length ? (
+          filteredEvents.slice(0, 20).map((item) => (
+            <View
+              key={item.id}
+              style={[styles.listRow, { borderColor: theme.colors.border }]}
+            >
+              <View style={styles.rowMain}>
+                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
+                  {normalizeEventType(item.event_type)}
+                </Text>
+                <Text
+                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                >
+                  {formatDateBR(item.event_date)} • Égua:{" "}
+                  {inferMareName(item) || "-"}
+                </Text>
+                <Text
+                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                >
+                  Garanhão: {item.stallion_name || "-"}
+                </Text>
+              </View>
+              <Text
+                style={[styles.rowStatus, { color: theme.colors.textMuted }]}
+              >
+                {item.status || "-"}
+              </Text>
+            </View>
           ))
         ) : (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Nenhum evento técnico encontrado.</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
+            Nenhum evento reprodutivo.
+          </Text>
         )}
       </Card>
 
       <Card>
         <View style={styles.row}>
           <Baby size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Gestação e Receptoras</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            Gestações
+          </Text>
         </View>
-        {gestations.length ? (
-          gestations.slice(0, 10).map((item) => (
+        <View style={styles.filterRow}>
+          {([
+            { id: "all", label: "Todas" },
+            { id: "em_andamento", label: "Ativas" },
+            { id: "confirmada", label: "Confirmadas" },
+            { id: "nascimento", label: "Nascimento" },
+            { id: "aborto", label: "Aborto" },
+          ] as const).map((item) => (
             <Pressable
               key={item.id}
-              onPress={() => setSelectedGestation(item)}
+              onPress={() => setGestationFilter(item.id)}
               style={({ pressed }) => [
-                styles.listRow,
-                { borderColor: theme.colors.border, opacity: pressed ? 0.78 : 1 },
+                styles.filterChip,
+                {
+                  borderColor:
+                    gestationFilter === item.id
+                      ? theme.colors.primary
+                      : theme.colors.border,
+                  backgroundColor:
+                    gestationFilter === item.id
+                      ? theme.colors.surfaceAlt
+                      : "transparent",
+                  opacity: pressed ? 0.82 : 1,
+                },
               ]}
             >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>Égua: {item.egua_name || "Não informada"}</Text>
-                <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>Parto: {formatDateBR(item.data_prevista_parto)}</Text>
-              </View>
-              <Text style={[styles.rowStatus, { color: theme.colors.textMuted }]}>{item.status || "-"}</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 12 }}>
+                {item.label}
+              </Text>
             </Pressable>
+          ))}
+        </View>
+        {gestationsQuery.isLoading ? (
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Carregando gestações...</Text>
+        ) : gestationsQuery.error ? (
+          <Text style={[styles.emptyText, { color: theme.colors.danger }]}>Não foi possível carregar gestações.</Text>
+        ) : filteredGestations.length ? (
+          filteredGestations.slice(0, 20).map((item) => (
+            <View
+              key={item.id}
+              style={[styles.listRow, { borderColor: theme.colors.border }]}
+            >
+              <View style={styles.rowMain}>
+                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
+                  Égua: {item.egua_name || "-"}
+                </Text>
+                <Text
+                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                >
+                  Diagnóstico: {formatDateBR(item.data_diagnostico)}
+                </Text>
+                <Text
+                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                >
+                  Garanhão: {item.garanhao_name || "-"}
+                </Text>
+                <Text
+                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                >
+                  Parto previsto: {formatDateBR(item.data_prevista_parto)}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() =>
+                  setStatusModal({ id: item.id })
+                }
+              >
+                <Text
+                  style={[styles.rowStatus, { color: theme.colors.primary }]}
+                >
+                  {item.status || "-"}
+                </Text>
+              </Pressable>
+            </View>
           ))
         ) : (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Nenhuma gestação encontrada.</Text>
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
+            Nenhuma gestação cadastrada.
+          </Text>
         )}
       </Card>
 
-      <Modal visible={Boolean(selectedEvent)} transparent animationType="fade" onRequestClose={() => setSelectedEvent(null)}>
+      <Modal
+        visible={eventModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEventModalOpen(false)}
+      >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setSelectedEvent(null)} />
-          <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <View style={styles.row}>
-              <HeartPulse size={18} color={theme.colors.info} />
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Evento Clínico</Text>
-            </View>
-            <Text style={[styles.modalMainText, { color: theme.colors.text }]}>
-              {selectedEvent ? normalizeEventType(selectedEvent.event_type) : "-"}
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setEventModalOpen(false)}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={28}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+            contentContainerStyle={styles.modalContent}
+          >
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Novo evento reprodutivo
             </Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Data: {selectedEvent ? formatDateBR(selectedEvent.event_date) : "-"}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Status: {selectedEvent?.status || "-"}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>{selectedEvent?.observations || "Sem observações."}</Text>
-          </View>
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Tipo</Text>
+            <View style={styles.optionRow}>
+              {EVENT_TYPE_OPTIONS.map((item) => (
+                <Pressable
+                  key={item.value}
+                  onPress={() => setEventType(item.value)}
+                  style={({ pressed }) => [
+                    styles.optionChip,
+                    {
+                      borderColor:
+                        eventType === item.value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        eventType === item.value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
+                      opacity: pressed ? 0.84 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: theme.colors.text }}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <DateField label="Data" value={eventDate} onChange={setEventDate} />
+            <AnimalPicker
+              title="Égua"
+              animals={mares}
+              selectedId={eventMareId}
+              onSelect={setEventMareId}
+            />
+            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Égua selecionada: {selectedEventMareName}</Text>
+            <AnimalPicker
+              title="Garanhão (opcional)"
+              animals={stallions}
+              selectedId={eventStallionId}
+              onSelect={setEventStallionId}
+            />
+            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Garanhão selecionado: {selectedEventStallionName}</Text>
+            <AppButton
+              label="Limpar garanhão"
+              variant="ghost"
+              onPress={() => setEventStallionId("")}
+            />
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Status</Text>
+            <View style={styles.optionRow}>
+              {EVENT_STATUS_OPTIONS.map((value) => (
+                <Pressable
+                  key={value}
+                  onPress={() => setEventStatus(value)}
+                  style={({ pressed }) => [
+                    styles.optionChip,
+                    {
+                      borderColor:
+                        eventStatus === value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        eventStatus === value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
+                      opacity: pressed ? 0.84 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: theme.colors.text }}>{value}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextField
+              label="Observações"
+              value={eventNotes}
+              onChangeText={setEventNotes}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <AppButton
+                label="Cancelar"
+                variant="ghost"
+                onPress={() => setEventModalOpen(false)}
+              />
+              <AppButton
+                label="Salvar"
+                loading={createEventMutation.isPending}
+                disabled={!eventMareId.trim()}
+                onPress={() => {
+                  if (!harasId || !eventMareId.trim()) return;
+                  createEventMutation.mutate(
+                    {
+                      haras_id: harasId,
+                      animal_id: eventMareId.trim(),
+                      mare_id: eventMareId.trim(),
+                      stallion_id: eventStallionId.trim() || null,
+                      event_type: eventType.trim(),
+                      event_date: eventDate,
+                      status: eventStatus.trim() || null,
+                      observations: eventNotes.trim() || null,
+                      veterinarian: profile?.full_name || null,
+                    },
+                    {
+                      onSuccess: () => {
+                        setMessage({
+                          text: "Evento reprodutivo registrado.",
+                          tone: "success",
+                        });
+                        resetEventForm();
+                        setEventModalOpen(false);
+                      },
+                      onError: (e) =>
+                        setMessage({
+                          text:
+                            e instanceof Error
+                              ? e.message
+                              : "Falha ao salvar evento.",
+                          tone: "danger",
+                        }),
+                    },
+                  );
+                }}
+              />
+            </View>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
 
-      <Modal visible={Boolean(selectedGestation)} transparent animationType="fade" onRequestClose={() => setSelectedGestation(null)}>
+      <Modal
+        visible={gestationModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGestationModalOpen(false)}
+      >
         <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setSelectedGestation(null)} />
-          <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Gestação</Text>
-            <Text style={[styles.modalMainText, { color: theme.colors.text }]}>Égua: {selectedGestation?.egua_name || "-"}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Garanhão: {selectedGestation?.garanhao_name || "-"}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Diagnóstico: {formatDateBR(selectedGestation?.data_diagnostico)}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Parto previsto: {formatDateBR(selectedGestation?.data_prevista_parto)}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Status: {selectedGestation?.status || "-"}</Text>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setGestationModalOpen(false)}
+          />
+          <KeyboardAwareScrollView
+            bottomOffset={28}
+            extraKeyboardSpace={30}
+            keyboardShouldPersistTaps="handled"
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+            contentContainerStyle={styles.modalContent}
+          >
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Nova gestação
+            </Text>
+            <AnimalPicker
+              title="Égua"
+              animals={mares}
+              selectedId={gestationMareId}
+              onSelect={setGestationMareId}
+            />
+            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Égua selecionada: {selectedGestationMareName}</Text>
+            <AnimalPicker
+              title="Garanhão (opcional)"
+              animals={stallions}
+              selectedId={gestationStallionId}
+              onSelect={setGestationStallionId}
+            />
+            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Garanhão selecionado: {selectedGestationStallionName}</Text>
+            <AppButton
+              label="Limpar garanhão"
+              variant="ghost"
+              onPress={() => setGestationStallionId("")}
+            />
+            <DateField
+              label="Data inicial"
+              value={gestationStartDate}
+              onChange={setGestationStartDate}
+            />
+            <DateField
+              label="Data diagnóstico"
+              value={gestationConfirmDate}
+              onChange={setGestationConfirmDate}
+            />
+            <DateField
+              label="Parto previsto"
+              value={gestationExpectedBirth}
+              onChange={setGestationExpectedBirth}
+            />
+            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Status</Text>
+            <View style={styles.optionRow}>
+              {GESTATION_STATUS_OPTIONS.map((item) => (
+                <Pressable
+                  key={item.value}
+                  onPress={() => setGestationStatus(item.value)}
+                  style={({ pressed }) => [
+                    styles.optionChip,
+                    {
+                      borderColor:
+                        gestationStatus === item.value
+                          ? theme.colors.primary
+                          : theme.colors.border,
+                      backgroundColor:
+                        gestationStatus === item.value
+                          ? theme.colors.surfaceAlt
+                          : "transparent",
+                      opacity: pressed ? 0.84 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: theme.colors.text }}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <TextField
+              label="Observações"
+              value={gestationNotes}
+              onChangeText={setGestationNotes}
+              multiline
+            />
+            <View style={styles.modalActions}>
+              <AppButton
+                label="Cancelar"
+                variant="ghost"
+                onPress={() => setGestationModalOpen(false)}
+              />
+              <AppButton
+                label="Salvar"
+                loading={createGestationMutation.isPending}
+                disabled={!gestationMareId.trim()}
+                onPress={() => {
+                  if (!harasId || !gestationMareId.trim()) return;
+                  createGestationMutation.mutate(
+                    {
+                      haras_id: harasId,
+                      mare_id: gestationMareId.trim(),
+                      stallion_id: gestationStallionId.trim() || null,
+                      start_date: gestationStartDate,
+                      confirmation_date: gestationConfirmDate || null,
+                      expected_birth_date: gestationExpectedBirth || null,
+                      status: gestationStatus || "em_andamento",
+                      veterinarian: profile?.full_name || null,
+                      observations: gestationNotes.trim() || null,
+                    },
+                    {
+                      onSuccess: () => {
+                        setMessage({
+                          text: "Gestação registrada.",
+                          tone: "success",
+                        });
+                        resetGestationForm();
+                        setGestationModalOpen(false);
+                      },
+                      onError: (e) =>
+                        setMessage({
+                          text:
+                            e instanceof Error
+                              ? e.message
+                              : "Falha ao salvar gestação.",
+                          tone: "danger",
+                        }),
+                    },
+                  );
+                }}
+              />
+            </View>
+          </KeyboardAwareScrollView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={Boolean(statusModal)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setStatusModal(null)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setStatusModal(null)}
+          />
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+              Atualizar status da gestação
+            </Text>
+            <View style={styles.actionGrid}>
+              <AppButton
+                label="Em andamento"
+                variant="ghost"
+                onPress={() => {
+                  if (!statusModal) return;
+                  updateGestationStatusMutation.mutate(
+                    { id: statusModal.id, status: "em_andamento" },
+                    {
+                      onSuccess: () => {
+                        setStatusModal(null);
+                        setMessage({
+                          text: "Status atualizado.",
+                          tone: "success",
+                        });
+                      },
+                    },
+                  );
+                }}
+              />
+              <AppButton
+                label="Nascimento"
+                variant="ghost"
+                onPress={() => {
+                  if (!statusModal) return;
+                  updateGestationStatusMutation.mutate(
+                    { id: statusModal.id, status: "nascimento" },
+                    {
+                      onSuccess: () => {
+                        setStatusModal(null);
+                        setMessage({
+                          text: "Status atualizado.",
+                          tone: "success",
+                        });
+                      },
+                    },
+                  );
+                }}
+              />
+              <AppButton
+                label="Aborto"
+                onPress={() => {
+                  if (!statusModal) return;
+                  updateGestationStatusMutation.mutate(
+                    { id: statusModal.id, status: "aborto" },
+                    {
+                      onSuccess: () => {
+                        setStatusModal(null);
+                        setMessage({
+                          text: "Status atualizado.",
+                          tone: "success",
+                        });
+                      },
+                    },
+                  );
+                }}
+              />
+              <AppButton
+                label="Reabsorvida"
+                variant="ghost"
+                onPress={() => {
+                  if (!statusModal) return;
+                  updateGestationStatusMutation.mutate(
+                    { id: statusModal.id, status: "reabsorvida" },
+                    {
+                      onSuccess: () => {
+                        setStatusModal(null);
+                        setMessage({
+                          text: "Status atualizado.",
+                          tone: "success",
+                        });
+                      },
+                    },
+                  );
+                }}
+              />
+            </View>
           </View>
         </View>
       </Modal>
@@ -190,26 +925,73 @@ export function VetReproductionScreen() {
 
 const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: "center" },
-  loading: { fontSize: 14 },
-  header: { gap: 6 },
-  title: { fontSize: 28, fontWeight: "700" },
-  subtitle: { fontSize: 14, lineHeight: 20 },
   summaryGrid: { flexDirection: "row", gap: 10 },
   summaryCard: { flex: 1, minHeight: 86, justifyContent: "center", gap: 6 },
-  summaryLabel: { fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4 },
+  summaryLabel: {
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   summaryValue: { fontSize: 24, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   cardTitle: { fontSize: 15, fontWeight: "700" },
-  listRow: { borderBottomWidth: 1, paddingBottom: 8, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 10 },
+  actionGrid: { gap: 8, marginTop: 8 },
+  filterRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  filterChip: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  listRow: {
+    borderBottomWidth: 1,
+    paddingBottom: 8,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   rowMain: { flex: 1, gap: 2 },
   rowTitle: { fontSize: 14, fontWeight: "600" },
   rowMeta: { fontSize: 12 },
   rowStatus: { fontSize: 12, fontWeight: "700" },
   emptyText: { fontSize: 13 },
+  inputLabel: { fontSize: 14, fontWeight: "600" },
+  helperText: { fontSize: 12 },
+  optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  optionChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 34,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectorBlock: { gap: 8 },
+  selectorList: {
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 90,
+    maxHeight: 140,
+    padding: 8,
+  },
+  selectorScroll: { flexGrow: 0 },
+  selectorItem: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
   modalRoot: { flex: 1, justifyContent: "center", padding: 16 },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.58)" },
-  modalCard: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10 },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
+  modalCard: { borderWidth: 1, borderRadius: 16, maxHeight: "90%" },
+  modalContent: { padding: 16, gap: 10 },
   modalTitle: { fontSize: 16, fontWeight: "700" },
-  modalMainText: { fontSize: 16, fontWeight: "700" },
-  modalLine: { fontSize: 13, lineHeight: 18 },
+  modalActions: { gap: 8, marginTop: 6 },
 });

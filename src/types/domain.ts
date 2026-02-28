@@ -95,10 +95,16 @@ export interface PaginatedResponse<T> {
 
 export interface ReproductionEventItem {
   id: string;
+  haras_id?: string;
+  animal_id?: string | null;
+  mare_id?: string | null;
+  stallion_id?: string | null;
   event_type: string;
   event_date: string;
   status: string | null;
   veterinarian: string | null;
+  protocol?: string | null;
+  semen_type?: string | null;
   animal_name: string | null;
   mare_name: string | null;
   stallion_name: string | null;
@@ -107,12 +113,52 @@ export interface ReproductionEventItem {
 
 export interface GestationItem {
   id: string;
+  haras_id?: string;
+  mare_id?: string | null;
+  stallion_id?: string | null;
   status: string | null;
+  start_date?: string | null;
   data_diagnostico: string | null;
   data_prevista_parto: string | null;
+  data_parto?: string | null;
   egua_name: string | null;
   garanhao_name: string | null;
   observacoes: string | null;
+}
+
+export interface ReproductionStats {
+  total_events: number;
+  total_gestations: number;
+  active_gestations: number;
+  births: number;
+  abortions: number;
+}
+
+export interface CreateReproductiveEventInput {
+  haras_id: string;
+  animal_id: string;
+  event_type: string;
+  event_date: string;
+  stallion_id?: string | null;
+  mare_id?: string | null;
+  veterinarian?: string | null;
+  protocol?: string | null;
+  observations?: string | null;
+  status?: string | null;
+  semen_type?: string | null;
+}
+
+export interface CreateGestationInput {
+  haras_id: string;
+  mare_id: string;
+  stallion_id?: string | null;
+  reproductive_event_id?: string | null;
+  start_date: string;
+  confirmation_date?: string | null;
+  expected_birth_date?: string | null;
+  status?: string | null;
+  veterinarian?: string | null;
+  observations?: string | null;
 }
 
 export interface AgendaEventItem {
@@ -125,6 +171,7 @@ export interface AgendaEventItem {
   status: string | null;
   local: string | null;
   responsavel: string | null;
+  animal_id: string | null;
   animal_name: string | null;
 }
 
@@ -140,6 +187,110 @@ export interface VetTaskItem {
   priority: string;
   source_table: string | null;
   source_id: string | null;
+}
+
+export type TaskStatus = "pendente" | "em_andamento" | "concluida";
+export type TaskPriority = "baixa" | "media" | "alta";
+export type TaskExecutionOutcome = "concluida" | "incompleta" | "nao_realizada" | "reagendada";
+
+export interface TaskAttachment {
+  kind: "photo" | "document";
+  url: string;
+  name: string;
+  mime_type: string | null;
+  uploaded_at: string;
+}
+
+export interface TaskExecutionItem {
+  id: string;
+  task_id: string;
+  haras_id: string;
+  executed_by: string;
+  outcome: TaskExecutionOutcome;
+  notes: string | null;
+  attachments: TaskAttachment[];
+  executed_at: string;
+  created_at: string;
+}
+
+export interface TaskItem {
+  id: string;
+  haras_id: string;
+  title: string;
+  due_date: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  observations: string | null;
+  task_type: string | null;
+  animal_id: string | null;
+  responsible_id: string | null;
+  documents: TaskAttachment[];
+  photos: TaskAttachment[];
+  started_at: string | null;
+  completed_at: string | null;
+  last_execution_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  animal_name: string | null;
+  responsible_name: string | null;
+}
+
+export interface TaskListFilters {
+  haras_id: string;
+  responsible_id?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  search?: string;
+  from_due_date?: string;
+  to_due_date?: string;
+}
+
+export interface CreateTaskInput {
+  haras_id: string;
+  title: string;
+  due_date: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  observations?: string | null;
+  task_type?: string | null;
+  animal_id?: string | null;
+  responsible_id?: string | null;
+  created_by?: string | null;
+}
+
+export interface UpdateTaskInput {
+  title?: string;
+  due_date?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  observations?: string | null;
+  task_type?: string | null;
+  animal_id?: string | null;
+  responsible_id?: string | null;
+}
+
+export interface TaskExecutionDraftAttachment {
+  kind: "photo" | "document";
+  uri: string;
+  file_name: string;
+  mime_type?: string | null;
+}
+
+export interface ExecuteTaskInput {
+  task_id: string;
+  haras_id: string;
+  executed_by: string;
+  outcome: TaskExecutionOutcome;
+  notes?: string | null;
+  next_due_date?: string | null;
+  attachments?: TaskExecutionDraftAttachment[];
+}
+
+export interface TeamMemberOption {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
 }
 
 export interface VetDashboardData {
@@ -225,6 +376,176 @@ export interface TreatmentInput {
   veterinarian_name: string | null;
   notes: string | null;
   created_by?: string | null;
+}
+
+export interface HealthRecord {
+  id: string;
+  animal_id: string;
+  haras_id: string;
+  procedure_date: string;
+  type: string;
+  veterinarian: string | null;
+  description: string | null;
+  cost: number | null;
+  next_date: string | null;
+  observations: string | null;
+  medications: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    notes?: string | null;
+  }>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VaccineRecord {
+  id: string;
+  animal_id: string;
+  haras_id: string;
+  name: string;
+  application_date: string;
+  next_dose_date: string | null;
+  lot: string | null;
+  manufacturer: string | null;
+  veterinarian: string | null;
+  observations: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExamRecord {
+  id: string;
+  animal_id: string;
+  haras_id: string;
+  exam_type: string;
+  exam_date: string;
+  veterinarian: string | null;
+  laboratory: string | null;
+  result: string | null;
+  file_urls: string[] | null;
+  observations: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateHealthRecordInput {
+  animal_id: string;
+  haras_id?: string;
+  procedure_date: string;
+  type: string;
+  veterinarian?: string | null;
+  description?: string | null;
+  cost?: number | null;
+  next_date?: string | null;
+  observations?: string | null;
+  medications?: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    notes?: string | null;
+  }>;
+}
+
+export interface UpdateHealthRecordInput {
+  id: string;
+  procedure_date?: string;
+  type?: string;
+  veterinarian?: string | null;
+  description?: string | null;
+  cost?: number | null;
+  next_date?: string | null;
+  observations?: string | null;
+  medications?: Array<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration: string;
+    notes?: string | null;
+  }>;
+}
+
+export interface CreateVaccineInput {
+  animal_id: string;
+  haras_id?: string;
+  name: string;
+  application_date: string;
+  next_dose_date?: string | null;
+  lot?: string | null;
+  manufacturer?: string | null;
+  veterinarian?: string | null;
+  observations?: string | null;
+}
+
+export interface UpdateVaccineInput {
+  id: string;
+  name?: string;
+  application_date?: string;
+  next_dose_date?: string | null;
+  lot?: string | null;
+  manufacturer?: string | null;
+  veterinarian?: string | null;
+  observations?: string | null;
+}
+
+export interface CreateExamInput {
+  animal_id: string;
+  haras_id?: string;
+  exam_type: string;
+  exam_date: string;
+  veterinarian?: string | null;
+  laboratory?: string | null;
+  result?: string | null;
+  observations?: string | null;
+  file_urls?: string[];
+  file_uris?: Array<{ uri: string; file_name: string; mime_type?: string | null }>;
+  on_upload_progress?: (progress: {
+    completed_files: number;
+    total_files: number;
+    percent: number;
+    current_file_name?: string;
+  }) => void;
+}
+
+export interface UpdateExamInput {
+  id: string;
+  exam_type?: string;
+  exam_date?: string;
+  veterinarian?: string | null;
+  laboratory?: string | null;
+  result?: string | null;
+  observations?: string | null;
+  file_urls?: string[] | null;
+  file_uris?: Array<{ uri: string; file_name: string; mime_type?: string | null }>;
+  on_upload_progress?: (progress: {
+    completed_files: number;
+    total_files: number;
+    percent: number;
+    current_file_name?: string;
+  }) => void;
+}
+
+export interface HealthAuditLog {
+  id: string;
+  table_name: "health_records" | "vaccines" | "exams";
+  record_id: string;
+  haras_id: string;
+  animal_id: string | null;
+  action: "INSERT" | "UPDATE" | "DELETE";
+  changed_by: string | null;
+  changed_by_name: string | null;
+  changed_at: string;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
+}
+
+export interface HealthSummary {
+  totalAnimals: number;
+  vaccinatedUpToDate: number;
+  vaccineOverdue: number;
+  activeAlerts: number;
 }
 
 export interface FieldBirthInput {

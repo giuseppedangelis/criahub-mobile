@@ -245,6 +245,18 @@ async function executeCompleteTask(payload: { taskId: string; harasId: string })
 }
 
 async function executeCreateTreatment(payload: TreatmentInput) {
+  const medicationPlan = payload.medication
+    ? [
+        {
+          name: payload.medication,
+          dosage: payload.dosage || "",
+          frequency: "",
+          duration: "",
+          notes: null,
+        },
+      ]
+    : [];
+
   const { error } = await supabase.from("health_records").insert({
     haras_id: payload.haras_id,
     animal_id: payload.animal_id,
@@ -253,9 +265,8 @@ async function executeCreateTreatment(payload: TreatmentInput) {
     tipo: payload.type,
     veterinario: payload.veterinarian_name,
     descricao: payload.description,
-    medicamento: payload.medication,
-    dosagem: payload.dosage,
     observacoes: payload.notes,
+    medication_plan: medicationPlan,
   });
   if (error) handleSupabaseError(error);
 }

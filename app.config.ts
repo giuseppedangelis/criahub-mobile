@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     output: "static",
     favicon: "./assets/images/favicon-criahub.png",
   },
-  plugins: ["expo-router", "expo-video"],
+  plugins: ["expo-router", "expo-video", "@react-native-community/datetimepicker"],
   experiments: {
     typedRoutes: true,
   },

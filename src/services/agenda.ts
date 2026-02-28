@@ -50,6 +50,7 @@ export const agendaService = {
         status: item.status ?? null,
         local: item.local ?? null,
         responsavel: item.responsavel ?? null,
+        animal_id: item.animal_id ?? null,
         animal_name: item.animal_id ? namesMap.get(item.animal_id) ?? null : null,
       }));
 
@@ -62,5 +63,17 @@ export const agendaService = {
       }
       throw error;
     }
+  },
+
+  async updateStatus(eventId: string, status: "Pendente" | "Em andamento" | "Concluído" | "Cancelado") {
+    const { data, error } = await supabase
+      .from("events")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", eventId)
+      .select("id")
+      .single();
+
+    if (error) handleSupabaseError(error);
+    return data.id as string;
   },
 };

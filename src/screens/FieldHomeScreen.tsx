@@ -17,9 +17,11 @@ import { useRouter } from "expo-router";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { Card } from "@/src/components/ui/Card";
+import { TaskExecutionModal } from "@/src/components/tasks/TaskExecutionModal";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAnimalsQuery } from "@/src/hooks/useAnimals";
+import { useExecuteTaskMutation, useTasksQuery } from "@/src/hooks/useTasks";
 import {
   useFieldSyncSnapshotQuery,
   useFlushFieldQueueMutation,
@@ -107,6 +109,19 @@ export function FieldHomeScreen() {
   const [issueAnimalSearch, setIssueAnimalSearch] = useState("");
   const [issueAnimalId, setIssueAnimalId] = useState("");
   const [issueNote, setIssueNote] = useState("");
+  const [selectedTask, setSelectedTask] = useState<{ id: string; title: string } | null>(null);
+
+  const tasksQuery = useTasksQuery(
+    harasId && user?.id
+      ? {
+          haras_id: harasId,
+          responsible_id: user.id,
+          to_due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        }
+      : null,
+    canAccess
+  );
+  const executeTaskMutation = useExecuteTaskMutation();
 
   const runSyncWithFeedback = () => {
     flushQueue.mutate(undefined, {
@@ -327,6 +342,35 @@ export function FieldHomeScreen() {
         <Text style={[styles.bigCardTitle, { color: theme.colors.text }]}>Buscar Animal</Text>
       </Pressable>
 
+      <Card>
+        <Text style={[styles.syncTitle, { color: theme.colors.text }]}>Minhas tarefas</Text>
+        <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Somente tarefas atribuídas a você.</Text>
+
+        {tasksQuery.isLoading ? (
+          <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Carregando tarefas...</Text>
+        ) : tasksQuery.data?.length ? (
+          tasksQuery.data
+            .filter((item) => item.status !== "concluida")
+            .slice(0, 12)
+            .map((task) => (
+              <View key={task.id} style={[styles.taskRow, { borderColor: theme.colors.border }]}> 
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: "600" }}>{task.title}</Text>
+                  <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Prazo: {task.due_date}</Text>
+                  <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Status: {task.status}</Text>
+                </View>
+                <AppButton
+                  label="Executar"
+                  variant="ghost"
+                  onPress={() => setSelectedTask({ id: task.id, title: task.title })}
+                />
+              </View>
+            ))
+        ) : (
+          <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Nenhuma tarefa atribuída no momento.</Text>
+        )}
+      </Card>
+
       <Modal visible={birthModal} transparent animationType="slide" onRequestClose={() => setBirthModal(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.modalBackdrop} onPress={() => setBirthModal(false)} />
@@ -514,6 +558,36 @@ export function FieldHomeScreen() {
           </KeyboardAwareScrollView>
         </View>
       </Modal>
+
+      <TaskExecutionModal
+        visible={Boolean(selectedTask)}
+        task={selectedTask}
+        loading={executeTaskMutation.isPending}
+        onClose={() => setSelectedTask(null)}
+        onSubmit={(payload) => {
+          if (!harasId || !user?.id || !selectedTask) return;
+          executeTaskMutation.mutate(
+            {
+              task_id: selectedTask.id,
+              haras_id: harasId,
+              executed_by: user.id,
+              outcome: payload.outcome,
+              notes: payload.notes,
+              next_due_date: payload.next_due_date,
+              attachments: payload.attachments,
+            },
+            {
+              onSuccess: () => {
+                setSelectedTask(null);
+                setMessage({ text: "Execução enviada com sucesso.", tone: "success" });
+              },
+              onError: (error) => {
+                setMessage({ text: error instanceof Error ? error.message : "Falha ao executar tarefa.", tone: "danger" });
+              },
+            }
+          );
+        }}
+      />
     </AppScreen>
   );
 }
@@ -535,6 +609,17 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   bigCardTitle: { fontSize: 18, fontWeight: "700" },
+  taskRow: {
+    borderWidth: 1,
+    borderRadius: 12,
+    minHeight: 72,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginTop: 8,
+  },
   modalRoot: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
   modalCard: {
