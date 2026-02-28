@@ -13,8 +13,12 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const color =
     status === "ativo"
       ? theme.colors.success
+      : status === "provisorio"
+      ? theme.colors.info
       : status === "vendido"
       ? theme.colors.info
+      : status === "em_servico"
+      ? theme.colors.primary
       : status === "emprestado"
       ? theme.colors.warning
       : theme.colors.danger;

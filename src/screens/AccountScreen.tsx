@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react-native";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { AppScreen } from "@/src/components/ui/AppScreen";
@@ -5,6 +6,7 @@ import { AppButton } from "@/src/components/ui/AppButton";
 import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { supabase } from "@/src/services/base";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import { formatRole } from "@/src/utils/format";
 
@@ -21,6 +23,36 @@ function ProfileLine({ label, value }: { label: string; value: string }) {
 export function AccountScreen() {
   const { profile, role, signOut } = useAuth();
   const { mode, theme, toggleTheme } = useAppTheme();
+  const [harasName, setHarasName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const harasId = profile?.haras_id ?? null;
+    let mounted = true;
+
+    if (!harasId) {
+      setHarasName(null);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    setHarasName(null);
+
+    void (async () => {
+      try {
+        const { data } = await supabase.from("haras").select("nome").eq("id", harasId).maybeSingle();
+        if (!mounted) return;
+        setHarasName(data?.nome ?? null);
+      } catch {
+        if (!mounted) return;
+        setHarasName(null);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [profile?.haras_id]);
 
   return (
     <AppScreen scroll>
@@ -36,7 +68,7 @@ export function AccountScreen() {
         <ProfileLine label="Nome" value={profile?.full_name || "Não informado"} />
         <ProfileLine label="Email" value={profile?.email || "Não informado"} />
         <ProfileLine label="Perfil" value={formatRole(role)} />
-        <ProfileLine label="Haras" value={profile?.haras_id || "Não informado"} />
+        <ProfileLine label="Haras" value={harasName || "Não informado"} />
       </Card>
 
       <Card>
@@ -83,7 +115,7 @@ export function AccountScreen() {
 
       <Pressable style={styles.footerInfo}>
         <Text style={[styles.footerText, { color: theme.colors.textMuted }]}> 
-          CRIAHUB Mobile V1 - Módulo Criador
+          CRIAHUB Mobile
         </Text>
       </Pressable>
     </AppScreen>

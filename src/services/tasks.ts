@@ -73,7 +73,7 @@ export const tasksService = {
   async list(filters: TaskListFilters): Promise<TaskItem[]> {
     let query = supabase
       .from("tasks")
-      .select("*, animal:animals(id,nome), responsible:profiles(id,full_name,email)")
+      .select("*, animal:animals(id,nome), responsible:profiles!tasks_responsible_id_fkey(id,full_name,email)")
       .eq("haras_id", filters.haras_id)
       .order("due_date", { ascending: true })
       .order("created_at", { ascending: false })
@@ -109,7 +109,7 @@ export const tasksService = {
         responsible_id: input.responsible_id ?? null,
         created_by: input.created_by ?? null,
       })
-      .select("*, animal:animals(id,nome), responsible:profiles(id,full_name,email)")
+      .select("*, animal:animals(id,nome), responsible:profiles!tasks_responsible_id_fkey(id,full_name,email)")
       .single();
 
     if (error) handleSupabaseError(error);
@@ -134,7 +134,7 @@ export const tasksService = {
       .from("tasks")
       .update(payload)
       .eq("id", taskId)
-      .select("*, animal:animals(id,nome), responsible:profiles(id,full_name,email)")
+      .select("*, animal:animals(id,nome), responsible:profiles!tasks_responsible_id_fkey(id,full_name,email)")
       .single();
 
     if (error) handleSupabaseError(error);
@@ -248,15 +248,12 @@ export const tasksService = {
   },
 
   async listAssignableMembers(harasId: string): Promise<TeamMemberOption[]> {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, role")
-      .eq("haras_id", harasId)
-      .in("role", ["veterinario", "peao", "funcionario", "criador"])
-      .order("full_name", { ascending: true });
+    const { data, error } = await supabase.rpc("list_haras_assignable_members", {
+      p_haras_id: harasId,
+    });
     if (error) handleSupabaseError(error);
-    return (data ?? []).map((item) => ({
-      id: item.id,
+    return (data ?? []).map((item: { user_id: string; full_name: string | null; email: string | null; role: string }) => ({
+      id: item.user_id,
       full_name: item.full_name ?? null,
       email: item.email ?? null,
       role: item.role,

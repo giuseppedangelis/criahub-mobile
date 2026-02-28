@@ -13,8 +13,18 @@ import { isFieldStaffRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type { Animal } from "@/src/types/domain";
 
+function isCondominioAnimal(owner: string | null) {
+  if (!owner) return false;
+  const normalized = owner
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return normalized.includes("CONDOMINIO");
+}
+
 function AnimalResultItem({ item, onPress }: { item: Animal; onPress: (id: string) => void }) {
   const { theme } = useAppTheme();
+  const isCondominio = isCondominioAnimal(item.proprietario);
 
   return (
     <Pressable onPress={() => onPress(item.id)}>
@@ -22,11 +32,21 @@ function AnimalResultItem({ item, onPress }: { item: Animal; onPress: (id: strin
         <View style={styles.itemHeader}>
           <View style={styles.itemTextWrap}>
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.name}</Text>
-            <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>
+            <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}> 
               Registro {item.registry_number || "não informado"}
             </Text>
+            {item.proprietario ? (
+              <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>Proprietário: {item.proprietario}</Text>
+            ) : null}
           </View>
-          <StatusBadge status={item.status} />
+          <View style={styles.statusWrap}>
+            {isCondominio ? (
+              <View style={styles.condominioTag}>
+                <Text style={styles.condominioTagLabel}>Condomínio</Text>
+              </View>
+            ) : null}
+            <StatusBadge status={item.status} />
+          </View>
         </View>
       </Card>
     </Pressable>
@@ -151,4 +171,22 @@ const styles = StyleSheet.create({
   itemTextWrap: { flex: 1, gap: 2 },
   itemTitle: { fontSize: 17, fontWeight: "700" },
   itemSubtitle: { fontSize: 12, lineHeight: 16 },
+  statusWrap: { alignItems: "flex-end", gap: 6 },
+  condominioTag: {
+    borderWidth: 1,
+    borderColor: "#B45309",
+    backgroundColor: "#F59E0B22",
+    borderRadius: 999,
+    minHeight: 20,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  condominioTagLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B45309",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
 });

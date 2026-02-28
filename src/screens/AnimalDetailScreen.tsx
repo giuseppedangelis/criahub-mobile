@@ -21,7 +21,7 @@ import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { useAnimalDetailsQuery } from "@/src/hooks/useAnimalDetails";
 import { useAnimalQuery } from "@/src/hooks/useAnimals";
 import { useAppTheme } from "@/src/theme/ThemeContext";
-import { formatCategoryLabel, formatDateBR } from "@/src/utils/format";
+import { formatCategoryLabel, formatDateBR, formatStatusLabel } from "@/src/utils/format";
 
 type DetailTab =
   | "overview"
@@ -66,6 +66,15 @@ function supportsInlineVideo(url: string) {
   const blockedDomains = /youtube\.com|youtu\.be|vimeo\.com/i;
   if (blockedDomains.test(url)) return false;
   return true;
+}
+
+function isCondominioAnimal(owner: string | null) {
+  if (!owner) return false;
+  const normalized = owner
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return normalized.includes("CONDOMINIO");
 }
 
 function InlineVideoPlayer({ url }: { url: string }) {
@@ -149,6 +158,7 @@ export function AnimalDetailScreen() {
   const videos = extra?.videos ?? [];
   const extraWarnings = extra?.warnings ?? [];
   const selectedVideo = videos.find((item) => item.id === selectedVideoId) ?? null;
+  const isCondominio = isCondominioAnimal(animal?.proprietario ?? null);
 
   useEffect(() => {
     if (!isPhotoModalVisible) return;
@@ -253,6 +263,7 @@ export function AnimalDetailScreen() {
             <MetaBadge label={animal.sex} />
             <MetaBadge label={formatCategoryLabel(animal.category)} />
             <MetaBadge label={animal.location || "Sem localização"} />
+            {isCondominio ? <MetaBadge label="Condomínio" /> : null}
           </View>
         </Card>
 
@@ -333,7 +344,13 @@ export function AnimalDetailScreen() {
             <DetailRow label="Pelagem" value={animal.coat_color || "Não informado"} />
             <DetailRow label="Marca/Ferro" value={animal.brand || "Não informado"} />
             <DetailRow label="Chip RFID" value={animal.chip_number || "Não informado"} />
+            <DetailRow label="Status" value={formatStatusLabel(animal.status)} />
+            <DetailRow label="Proprietário" value={animal.proprietario || "Não informado"} />
+            <DetailRow label="Criador" value={animal.criador || "Não informado"} />
             <DetailRow label="Haras Atual" value="Meu Haras" />
+            <DetailRow label="Haras de origem" value={animal.origin_haras || "Não informado"} />
+            <DetailRow label="Tipo de serviço" value={animal.service_type || "Não informado"} />
+            <DetailRow label="Status de manejo" value={animal.management_status || "Não informado"} />
             <DetailRow label="Local atual" value={animal.location || "Não informado"} />
             <DetailRow label="Total de documentos" value={String(extra?.documents.length || 0)} />
             <DetailRow label="Total de vídeos" value={String(extra?.videos.length || 0)} />

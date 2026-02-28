@@ -32,22 +32,29 @@ const CATEGORY_MAPPING_DB_TO_APP: Record<string, AnimalCategory> = {
 
 const STATUS_MAPPING_DB_TO_APP: Record<string, AnimalStatus> = {
   Ativo: "ativo",
+  Provisorio: "provisorio",
+  "Provisório": "provisorio",
   Vendido: "vendido",
   Falecido: "morto",
   Transferido: "emprestado",
+  "Em Servico": "em_servico",
+  "Em Serviço": "em_servico",
 };
 
 const STATUS_MAPPING_APP_TO_DB: Record<AnimalStatus, string> = {
   ativo: "Ativo",
+  provisorio: "Provisorio",
   vendido: "Vendido",
   morto: "Falecido",
   emprestado: "Transferido",
+  em_servico: "Em Servico",
 };
 
 const ANIMAL_SELECT_FIELDS = `
   id, haras_id, nome, registro, chip, marca,
   sexo, categoria, data_nascimento, pelagem,
-  status, pai_id, mae_id, localizacao,
+  status, status_manejo, pai_id, mae_id, localizacao,
+  haras_origem, tipo_servico, criador, proprietario,
   foto_url, images, documents, observacoes,
   father_name, mother_name,
   created_at, updated_at
@@ -74,6 +81,11 @@ function mapAnimalFromDb(row: Record<string, any>): Animal {
     father_name: row.father_name ?? null,
     mother_name: row.mother_name ?? null,
     location: row.localizacao ?? null,
+    origin_haras: row.haras_origem ?? null,
+    service_type: row.tipo_servico ?? null,
+    management_status: row.status_manejo ?? null,
+    criador: row.criador ?? null,
+    proprietario: row.proprietario ?? null,
     observations: row.observacoes ?? null,
     main_image_url: mainImage,
     images: images.length > 0 ? images : mainImage ? [mainImage] : [],

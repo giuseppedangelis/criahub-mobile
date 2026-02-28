@@ -39,6 +39,8 @@ const SEX_OPTIONS: Array<{ label: string; value: SexFilter }> = [
 const STATUS_OPTIONS: Array<{ label: string; value: StatusFilter }> = [
   { label: "Todos", value: "all" },
   { label: "Ativos", value: "ativo" },
+  { label: "Provisórios", value: "provisorio" },
+  { label: "Em serviço", value: "em_servico" },
   { label: "Vendidos", value: "vendido" },
   { label: "Falecidos", value: "morto" },
   { label: "Transferidos", value: "emprestado" },
@@ -53,8 +55,18 @@ const CATEGORY_OPTIONS: Array<{ label: string; value: CategoryFilter }> = [
   { label: "Castrado", value: "castrado" },
 ];
 
+function isCondominioAnimal(owner: string | null) {
+  if (!owner) return false;
+  const normalized = owner
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return normalized.includes("CONDOMINIO");
+}
+
 function AnimalItem({ item, onPress }: { item: Animal; onPress: (animalId: string) => void }) {
   const { theme } = useAppTheme();
+  const isCondominio = isCondominioAnimal(item.proprietario);
 
   return (
     <Pressable onPress={() => onPress(item.id)}>
@@ -62,11 +74,32 @@ function AnimalItem({ item, onPress }: { item: Animal; onPress: (animalId: strin
         <View style={styles.itemHeader}>
           <View style={styles.itemTitleWrapper}>
             <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.name}</Text>
-            <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>
+            <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}> 
               Registro {item.registry_number || "não informado"}
             </Text>
+            {item.proprietario ? (
+              <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>Proprietário: {item.proprietario}</Text>
+            ) : null}
+            {item.criador ? (
+              <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>Criador: {item.criador}</Text>
+            ) : null}
           </View>
-          <StatusBadge status={item.status} />
+          <View style={styles.itemStatusWrap}>
+            {isCondominio ? (
+              <View
+                style={[
+                  styles.condominioTag,
+                  {
+                    borderColor: "#B45309",
+                    backgroundColor: "#F59E0B22",
+                  },
+                ]}
+              >
+                <Text style={styles.condominioTagLabel}>Condomínio</Text>
+              </View>
+            ) : null}
+            <StatusBadge status={item.status} />
+          </View>
         </View>
 
         <View style={styles.itemMetaRow}>
@@ -170,6 +203,7 @@ export function PlantelScreen() {
   const maleCount = items.filter((item) => item.sex === "Macho").length;
   const femaleCount = items.filter((item) => item.sex === "Fêmea").length;
   const activeCount = items.filter((item) => item.status === "ativo").length;
+  const condominioCount = items.filter((item) => isCondominioAnimal(item.proprietario)).length;
   const hasActiveFilters = sexFilter !== "all" || statusFilter !== "all" || categoryFilter !== "all";
 
   const selectedFiltersText = [
@@ -317,6 +351,7 @@ export function PlantelScreen() {
         <SummaryCard label="Machos" value={String(maleCount)} />
         <SummaryCard label="Fêmeas" value={String(femaleCount)} />
         <SummaryCard label="Ativos" value={String(activeCount)} />
+        <SummaryCard label="Condomínio" value={String(condominioCount)} />
       </ScrollView>
 
       <Text style={[styles.resultsText, { color: theme.colors.textMuted }]}>{total} animal(is) encontrado(s)</Text>
@@ -578,6 +613,25 @@ const styles = StyleSheet.create({
   itemTitleWrapper: {
     flex: 1,
     gap: 2,
+  },
+  itemStatusWrap: {
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  condominioTag: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    minHeight: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  condominioTagLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B45309",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   itemTitle: {
     fontSize: 17,

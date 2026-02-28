@@ -61,6 +61,15 @@ function normalizeReproType(type: string) {
   return map[type] || type;
 }
 
+function isCondominioAnimal(owner: string | null) {
+  if (!owner) return false;
+  const normalized = owner
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return normalized.includes("CONDOMINIO");
+}
+
 export function VetAnimalChartScreen() {
   const { role, harasId } = useAuth();
   const { theme } = useAppTheme();
@@ -211,6 +220,7 @@ export function VetAnimalChartScreen() {
   }
 
   const animal = animalQuery.data;
+  const isCondominio = isCondominioAnimal(animal.proprietario);
   const procedures = proceduresQuery.data ?? [];
   const vaccines = vaccinesQuery.data ?? [];
   const exams = examsQuery.data ?? [];
@@ -364,9 +374,17 @@ export function VetAnimalChartScreen() {
     <AppScreen scroll>
       <Card>
         <Text style={[styles.animalName, { color: theme.colors.text }]}>{animal.name}</Text>
-        <Text style={[styles.animalMeta, { color: theme.colors.textMuted }]}>
+        <Text style={[styles.animalMeta, { color: theme.colors.textMuted }]}> 
           {animal.sex} • {formatCategoryLabel(animal.category)} • Registro {animal.registry_number || "-"}
         </Text>
+        {animal.proprietario ? (
+          <Text style={[styles.animalMeta, { color: theme.colors.textMuted }]}>Proprietário: {animal.proprietario}</Text>
+        ) : null}
+        {isCondominio ? (
+          <View style={styles.condominioTag}>
+            <Text style={styles.condominioTagLabel}>Condomínio</Text>
+          </View>
+        ) : null}
         {alerts.length ? (
           <View style={styles.alertsBlock}>
             {alerts.map((alert, index) => (
@@ -932,6 +950,24 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: "center" },
   animalName: { fontSize: 24, fontWeight: "700" },
   animalMeta: { fontSize: 13 },
+  condominioTag: {
+    marginTop: 8,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#B45309",
+    backgroundColor: "#F59E0B22",
+    borderRadius: 999,
+    minHeight: 22,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+  },
+  condominioTagLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B45309",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   alertsBlock: { marginTop: 10, gap: 8 },
   alertPill: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, minHeight: 36, alignItems: "center", flexDirection: "row", gap: 8 },
   alertText: { fontSize: 12, fontWeight: "600", flex: 1 },

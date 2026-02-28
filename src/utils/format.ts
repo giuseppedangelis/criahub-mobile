@@ -22,9 +22,11 @@ export function formatCategoryLabel(category: AnimalCategory): string {
 export function formatStatusLabel(status: AnimalStatus): string {
   const labels: Record<AnimalStatus, string> = {
     ativo: "Ativo",
+    provisorio: "Provisório",
     vendido: "Vendido",
     morto: "Falecido",
     emprestado: "Transferido",
+    em_servico: "Em serviço",
   };
   return labels[status];
 }

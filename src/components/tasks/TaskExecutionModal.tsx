@@ -36,6 +36,15 @@ export function TaskExecutionModal({ visible, task, loading, onClose, onSubmit }
   const [nextDueDate, setNextDueDate] = useState("");
   const [attachments, setAttachments] = useState<TaskExecutionDraftAttachment[]>([]);
 
+  const isNonConcluded = outcome !== "concluida";
+
+  const suggestNextDate = (daysAhead: number) => {
+    const base = new Date();
+    base.setDate(base.getDate() + daysAhead);
+    const iso = base.toISOString().slice(0, 10);
+    setNextDueDate(iso);
+  };
+
   const addPhoto = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) return;
@@ -82,7 +91,7 @@ export function TaskExecutionModal({ visible, task, loading, onClose, onSubmit }
     onSubmit({
       outcome,
       notes: notes.trim() || null,
-      next_due_date: outcome === "reagendada" ? nextDueDate.trim() : null,
+      next_due_date: isNonConcluded ? nextDueDate.trim() || null : null,
       attachments,
     });
   };
@@ -121,8 +130,55 @@ export function TaskExecutionModal({ visible, task, loading, onClose, onSubmit }
             ))}
           </View>
 
-          {outcome === "reagendada" ? (
-            <DateField label="Nova data" value={nextDueDate} onChange={setNextDueDate} />
+          {isNonConcluded ? (
+            <>
+              <DateField
+                label={outcome === "reagendada" ? "Nova data (obrigatória)" : "Sugerir nova data (opcional)"}
+                value={nextDueDate}
+                onChange={setNextDueDate}
+              />
+              <View style={styles.optionRow}>
+                <Pressable
+                  onPress={() => suggestNextDate(1)}
+                  style={({ pressed }) => [
+                    styles.optionChip,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: "transparent",
+                      opacity: pressed ? 0.82 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: theme.colors.text }}>Amanhã</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => suggestNextDate(3)}
+                  style={({ pressed }) => [
+                    styles.optionChip,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: "transparent",
+                      opacity: pressed ? 0.82 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: theme.colors.text }}>+3 dias</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => suggestNextDate(7)}
+                  style={({ pressed }) => [
+                    styles.optionChip,
+                    {
+                      borderColor: theme.colors.border,
+                      backgroundColor: "transparent",
+                      opacity: pressed ? 0.82 : 1,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: theme.colors.text }}>+7 dias</Text>
+                </Pressable>
+              </View>
+            </>
           ) : null}
 
           <TextField

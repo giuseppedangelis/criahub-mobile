@@ -23,7 +23,13 @@ export type AnimalCategory =
   | "egua"
   | "castrado";
 
-export type AnimalStatus = "ativo" | "vendido" | "morto" | "emprestado";
+export type AnimalStatus =
+  | "ativo"
+  | "provisorio"
+  | "vendido"
+  | "morto"
+  | "emprestado"
+  | "em_servico";
 
 export interface UserProfile {
   id: string;
@@ -63,6 +69,11 @@ export interface Animal {
   father_name: string | null;
   mother_name: string | null;
   location: string | null;
+  origin_haras: string | null;
+  service_type: string | null;
+  management_status: string | null;
+  criador: string | null;
+  proprietario: string | null;
   observations: string | null;
   main_image_url: string | null;
   images: string[];
@@ -573,4 +584,45 @@ export interface FieldIssueInput {
   gps?: { latitude: number; longitude: number } | null;
   reported_by: string;
   created_by?: string | null;
+}
+
+export type FieldPendingValidationType = "nascimento" | "ocorrencia";
+
+export type FieldPendingValidationStatus =
+  | "pendente"
+  | "em_analise"
+  | "aprovado"
+  | "correcao_solicitada"
+  | "rejeitado"
+  | "desconhecido";
+
+export interface FieldPendingValidationItem {
+  id: string;
+  source: "remote" | "offline";
+  haras_id: string;
+  created_by: string | null;
+  created_at: string;
+  type: FieldPendingValidationType;
+  status_raw: string | null;
+  status: FieldPendingValidationStatus;
+  validation_notes: string | null;
+  reported_by: string | null;
+  occurred_at: string | null;
+  location: string | null;
+  animal_name: string | null;
+  mare_name: string | null;
+  description: string | null;
+  photos: string[];
+}
+
+export interface FieldReturnNotificationItem {
+  id: string;
+  pending_id: string;
+  type: FieldPendingValidationType;
+  status: FieldPendingValidationStatus;
+  created_at: string;
+  title: string;
+  message: string;
+  read_at: string | null;
+  is_unread: boolean;
 }

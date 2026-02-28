@@ -1,10 +1,10 @@
 import { Redirect } from "expo-router";
-import { FieldHomeScreen } from "@/src/screens/FieldHomeScreen";
+import { FieldHomeHubScreen } from "@/src/screens/FieldHomeHubScreen";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { isFieldStaffRole } from "@/src/lib/roles";
 
 export default function CampoRoute() {
   const { role } = useAuth();
   if (!isFieldStaffRole(role)) return <Redirect href="/(app)/(tabs)/plantel" />;
-  return <FieldHomeScreen />;
+  return <FieldHomeHubScreen />;
 }

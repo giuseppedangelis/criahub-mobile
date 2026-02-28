@@ -1,7 +1,9 @@
 import { Redirect, Tabs } from "expo-router";
 import {
   AlertTriangle,
+  BellRing,
   CalendarDays,
+  CheckCircle2,
   ClipboardList,
   Heart,
   Home,
@@ -97,6 +99,10 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen name="campo" options={{ href: null }} />
+        <Tabs.Screen name="campo-pendencias" options={{ href: null }} />
+        <Tabs.Screen name="campo-gestacoes" options={{ href: null }} />
+        <Tabs.Screen name="campo-tarefas" options={{ href: null }} />
+        <Tabs.Screen name="campo-avisos" options={{ href: null }} />
         <Tabs.Screen name="buscar-animal" options={{ href: null }} />
       </Tabs>
     );
@@ -113,10 +119,31 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="buscar-animal"
+          name="campo-pendencias"
           options={{
-            title: "Buscar",
-            tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
+            title: "Pendências",
+            tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="campo-gestacoes"
+          options={{
+            title: "Gestações",
+            tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="campo-tarefas"
+          options={{
+            title: "Tarefas",
+            tabBarIcon: ({ color, size }) => <CheckCircle2 color={color} size={size} />,
+          }}
+        />
+        <Tabs.Screen
+          name="campo-avisos"
+          options={{
+            title: "Avisos",
+            tabBarIcon: ({ color, size }) => <BellRing color={color} size={size} />,
           }}
         />
         <Tabs.Screen
@@ -131,6 +158,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="reproducao" options={{ href: null }} />
         <Tabs.Screen name="veterinaria" options={{ href: null }} />
         <Tabs.Screen name="rotina" options={{ href: null }} />
+        <Tabs.Screen name="buscar-animal" options={{ href: null }} />
       </Tabs>
     );
   }
@@ -181,6 +209,10 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => <AlertTriangle color={color} size={size} />,
         }}
       />
+      <Tabs.Screen name="campo-pendencias" options={{ href: null }} />
+      <Tabs.Screen name="campo-gestacoes" options={{ href: null }} />
+      <Tabs.Screen name="campo-tarefas" options={{ href: null }} />
+      <Tabs.Screen name="campo-avisos" options={{ href: null }} />
       <Tabs.Screen
         name="buscar-animal"
         options={{

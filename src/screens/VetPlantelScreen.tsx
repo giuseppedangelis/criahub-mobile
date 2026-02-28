@@ -11,6 +11,16 @@ import { useAuth } from "@/src/contexts/AuthContext";
 import { useAnimalsQuery } from "@/src/hooks/useAnimals";
 import { isVeterinaryRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
+import { formatCategoryLabel } from "@/src/utils/format";
+
+function isCondominioAnimal(owner: string | null) {
+  if (!owner) return false;
+  const normalized = owner
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  return normalized.includes("CONDOMINIO");
+}
 
 export function VetPlantelScreen() {
   const { role, harasId } = useAuth();
@@ -88,8 +98,10 @@ export function VetPlantelScreen() {
         {query.isLoading ? (
           <Text style={[styles.line, { color: theme.colors.textMuted }]}>Carregando animais...</Text>
         ) : animals.length ? (
-          animals.map((item) => (
-            <Pressable
+          animals.map((item) => {
+            const isCondominio = isCondominioAnimal(item.proprietario);
+            return (
+              <Pressable
               key={item.id}
               onPress={() =>
                 router.push({ pathname: "/(app)/vet-prontuario/[id]", params: { id: item.id } })
@@ -105,12 +117,21 @@ export function VetPlantelScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.name}</Text>
                 <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}> 
-                  {item.sex} • {item.category} • Registro {item.registry_number || "-"}
+                  {item.sex} • {formatCategoryLabel(item.category)} • Registro {item.registry_number || "-"}
                 </Text>
+                {item.proprietario ? (
+                  <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>Proprietário: {item.proprietario}</Text>
+                ) : null}
               </View>
+              {isCondominio ? (
+                <View style={styles.condominioTag}>
+                  <Text style={styles.condominioTagLabel}>Condomínio</Text>
+                </View>
+              ) : null}
               <Text style={[styles.openLabel, { color: theme.colors.primary }]}>Abrir</Text>
-            </Pressable>
-          ))
+              </Pressable>
+            );
+          })
         ) : (
           <Text style={[styles.line, { color: theme.colors.textMuted }]}>Nenhum animal encontrado.</Text>
         )}
@@ -138,6 +159,23 @@ const styles = StyleSheet.create({
   },
   itemTitle: { fontSize: 14, fontWeight: "600" },
   itemMeta: { fontSize: 12 },
+  condominioTag: {
+    borderWidth: 1,
+    borderColor: "#B45309",
+    backgroundColor: "#F59E0B22",
+    borderRadius: 999,
+    minHeight: 20,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  condominioTagLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B45309",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   openLabel: { fontSize: 12, fontWeight: "700" },
   line: { fontSize: 13 },
 });
