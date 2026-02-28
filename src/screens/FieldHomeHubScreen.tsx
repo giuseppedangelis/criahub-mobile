@@ -222,7 +222,7 @@ export function FieldHomeHubScreen() {
             <AlertTriangle size={20} color={theme.colors.warning} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.colors.text, fontWeight: "700" }}>Registrar ocorrencia</Text>
-              <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Com foto e localizacao.</Text>
+              <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Observacao, correcao ou alerta em campo.</Text>
             </View>
           </Pressable>
           <Pressable onPress={() => router.push("/(app)/(tabs)/buscar-animal")} style={({ pressed }) => [styles.quickCard, { borderColor: theme.colors.border, opacity: pressed ? 0.85 : 1 }]}>
@@ -412,7 +412,7 @@ export function FieldHomeHubScreen() {
             contentContainerStyle={styles.modalContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Reportar problema</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Registrar ocorrencia</Text>
 
             <AppButton label={issuePhotoUri ? "Trocar foto" : "Tirar foto (opcional)"} variant="ghost" onPress={async () => {
               try {
@@ -472,18 +472,18 @@ export function FieldHomeHubScreen() {
             </View>
             {selectedIssueAnimal ? <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: "600" }}>Animal selecionado: {selectedIssueAnimal.name}</Text> : null}
 
-            <TextField value={issueNote} onChangeText={setIssueNote} placeholder="Explique rapido o problema" multiline style={styles.textArea} />
+            <TextField value={issueNote} onChangeText={setIssueNote} placeholder="Descreva a ocorrencia, observacao ou correcao" multiline style={styles.textArea} />
 
             <View style={styles.modalActions}>
               <AppButton label="Cancelar" variant="ghost" onPress={() => setIssueModal(false)} />
               <AppButton
-                label="Enviar alerta"
+                label="Enviar ocorrencia"
                 icon={Send}
                 loading={reportIssue.isPending}
                 onPress={async () => {
                   if (!harasId) return;
                   if (!issueNote.trim()) {
-                    setMessage({ text: "Descreva rapidamente o problema.", tone: "danger" });
+                    setMessage({ text: "Descreva rapidamente a ocorrencia, observacao ou correcao.", tone: "danger" });
                     return;
                   }
                   const gps = await readGps();

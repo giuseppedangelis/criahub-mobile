@@ -450,7 +450,7 @@ export function FieldHomeScreen() {
   const onSubmitIssue = async () => {
     if (!harasId) return;
     if (!issueNote.trim()) {
-      setMessage({ text: "Descreva rapidamente o problema.", tone: "danger" });
+      setMessage({ text: "Descreva rapidamente a ocorrencia, observacao ou correcao.", tone: "danger" });
       return;
     }
 
@@ -1007,8 +1007,8 @@ export function FieldHomeScreen() {
             keyboardShouldPersistTaps="handled"
           >
               <View style={styles.modalHandle} />
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Reportar Problema</Text>
-              <Text style={[styles.modalHint, { color: theme.colors.textMuted }]}>Descreva a ocorrência e envie para validação.</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Registrar Ocorrência</Text>
+              <Text style={[styles.modalHint, { color: theme.colors.textMuted }]}>Descreva a ocorrência, observação ou correção e envie para validação.</Text>
 
               <AppButton
                 label={issuePhotoUri ? "Trocar foto" : "Tirar foto (opcional)"}
@@ -1075,7 +1075,7 @@ export function FieldHomeScreen() {
               <TextField
                 value={issueNote}
                 onChangeText={setIssueNote}
-                placeholder="Explique rápido o problema"
+                placeholder="Descreva a ocorrência, observação ou correção"
                 multiline
                 style={styles.textArea}
               />
