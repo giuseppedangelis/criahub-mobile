@@ -163,7 +163,6 @@ export function FieldHomeScreen() {
   const [birthPhotoUri, setBirthPhotoUri] = useState<string | null>(null);
   const [birthMareSearch, setBirthMareSearch] = useState("");
   const [birthMareId, setBirthMareId] = useState("");
-  const [birthUnknownMare, setBirthUnknownMare] = useState(false);
   const [birthSex, setBirthSex] = useState<"Macho" | "Fêmea">("Macho");
   const [birthNote, setBirthNote] = useState("");
 
@@ -404,8 +403,8 @@ export function FieldHomeScreen() {
       setMessage({ text: "Foto do nascimento é obrigatória.", tone: "danger" });
       return;
     }
-    if (!birthUnknownMare && !birthMareId) {
-      setMessage({ text: "Selecione a mãe ou marque mãe desconhecida.", tone: "danger" });
+    if (!birthMareId) {
+      setMessage({ text: "Selecione a mãe (receptora/matriz).", tone: "danger" });
       return;
     }
 
@@ -414,9 +413,9 @@ export function FieldHomeScreen() {
     reportBirth.mutate(
       {
         haras_id: harasId,
-        mare_id: birthUnknownMare ? null : birthMareId,
-        mare_name: birthUnknownMare ? "Mãe desconhecida" : selectedMare?.name || "Não informado",
-        unknown_mare: birthUnknownMare,
+        mare_id: birthMareId,
+        mare_name: selectedMare?.name || "Não informado",
+        unknown_mare: false,
         foal_sex: birthSex,
         photo_uri: birthPhotoUri,
         note: birthNote.trim() || null,
@@ -429,7 +428,6 @@ export function FieldHomeScreen() {
           setBirthModal(false);
           setBirthPhotoUri(null);
           setBirthMareId("");
-          setBirthUnknownMare(false);
           setBirthNote("");
           refreshFieldPanels();
           setMessage({
@@ -663,7 +661,6 @@ export function FieldHomeScreen() {
                   disabled={!item.mare_id}
                   onPress={() => {
                     if (!item.mare_id) return;
-                    setBirthUnknownMare(false);
                     setBirthMareId(item.mare_id);
                     setBirthMareSearch(item.egua_name ?? "");
                     setBirthModal(true);
@@ -926,40 +923,27 @@ export function FieldHomeScreen() {
                 </View>
               ) : null}
 
-              <TextField value={birthMareSearch} onChangeText={setBirthMareSearch} placeholder="Buscar mãe pelo nome" />
-              {!birthUnknownMare ? (
-                <View style={[styles.selectList, { borderColor: theme.colors.border }]}> 
-                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                    {filteredMares.slice(0, 30).map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => setBirthMareId(item.id)}
-                        style={({ pressed }) => [
-                          styles.selectItem,
-                          {
-                            borderColor: birthMareId === item.id ? theme.colors.primary : theme.colors.border,
-                            backgroundColor: birthMareId === item.id ? theme.colors.surfaceAlt : "transparent",
-                            opacity: pressed ? 0.82 : 1,
-                          },
-                        ]}
-                      >
-                        <Text style={{ color: theme.colors.text }}>{item.name}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              ) : null}
-
-              <AppButton
-                label={birthUnknownMare ? "Mãe desconhecida: sim" : "Mãe desconhecida / não sei"}
-                variant="ghost"
-                onPress={() => setBirthUnknownMare((prev) => !prev)}
-              />
-              {birthUnknownMare ? (
-                <Text style={{ color: theme.colors.warning, fontSize: 12 }}>
-                  Atenção: mantenha a foto bem visível com o potro e a mãe.
-                </Text>
-              ) : null}
+              <TextField value={birthMareSearch} onChangeText={setBirthMareSearch} placeholder="Buscar receptora/matriz pelo nome" />
+              <View style={[styles.selectList, { borderColor: theme.colors.border }]}> 
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {filteredMares.slice(0, 30).map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => setBirthMareId(item.id)}
+                      style={({ pressed }) => [
+                        styles.selectItem,
+                        {
+                          borderColor: birthMareId === item.id ? theme.colors.primary : theme.colors.border,
+                          backgroundColor: birthMareId === item.id ? theme.colors.surfaceAlt : "transparent",
+                          opacity: pressed ? 0.82 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={{ color: theme.colors.text }}>{item.name}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
 
               <View style={styles.optionRow}>
                 {(["Macho", "Fêmea"] as const).map((value) => (

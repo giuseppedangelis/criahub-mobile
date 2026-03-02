@@ -80,7 +80,6 @@ export function FieldHomeHubScreen() {
   const [birthPhotoUri, setBirthPhotoUri] = useState<string | null>(null);
   const [birthMareSearch, setBirthMareSearch] = useState("");
   const [birthMareId, setBirthMareId] = useState("");
-  const [birthUnknownMare, setBirthUnknownMare] = useState(false);
   const [birthSex, setBirthSex] = useState<"Macho" | "Fêmea">("Macho");
   const [birthNote, setBirthNote] = useState("");
 
@@ -156,7 +155,6 @@ export function FieldHomeHubScreen() {
 
   useEffect(() => {
     if (params.openBirth !== "1") return;
-    setBirthUnknownMare(false);
     if (params.mareId) setBirthMareId(String(params.mareId));
     if (params.mareName) setBirthMareSearch(String(params.mareName));
     setBirthModal(true);
@@ -302,31 +300,27 @@ export function FieldHomeHubScreen() {
               </View>
             ) : null}
 
-            <TextField value={birthMareSearch} onChangeText={setBirthMareSearch} placeholder="Buscar mae pelo nome" />
-            {!birthUnknownMare ? (
-              <View style={[styles.selectList, { borderColor: theme.colors.border }]}> 
-                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {filteredMares.slice(0, 30).map((item) => (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => setBirthMareId(item.id)}
-                      style={({ pressed }) => [
-                        styles.selectItem,
-                        {
-                          borderColor: birthMareId === item.id ? theme.colors.primary : theme.colors.border,
-                          backgroundColor: birthMareId === item.id ? theme.colors.surfaceAlt : "transparent",
-                          opacity: pressed ? 0.82 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={{ color: theme.colors.text }}>{item.name}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
-
-            <AppButton label={birthUnknownMare ? "Mae desconhecida: sim" : "Mae desconhecida / nao sei"} variant="ghost" onPress={() => setBirthUnknownMare((prev) => !prev)} />
+            <TextField value={birthMareSearch} onChangeText={setBirthMareSearch} placeholder="Buscar receptora/matriz pelo nome" />
+            <View style={[styles.selectList, { borderColor: theme.colors.border }]}> 
+              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                {filteredMares.slice(0, 30).map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => setBirthMareId(item.id)}
+                    style={({ pressed }) => [
+                      styles.selectItem,
+                      {
+                        borderColor: birthMareId === item.id ? theme.colors.primary : theme.colors.border,
+                        backgroundColor: birthMareId === item.id ? theme.colors.surfaceAlt : "transparent",
+                        opacity: pressed ? 0.82 : 1,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: theme.colors.text }}>{item.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
 
             <View style={styles.optionRow}>
               {(["Macho", "Fêmea"] as const).map((value) => (
@@ -361,8 +355,8 @@ export function FieldHomeHubScreen() {
                     setMessage({ text: "Foto do nascimento e obrigatoria.", tone: "danger" });
                     return;
                   }
-                  if (!birthUnknownMare && !birthMareId) {
-                    setMessage({ text: "Selecione a mae ou marque mae desconhecida.", tone: "danger" });
+                  if (!birthMareId) {
+                    setMessage({ text: "Selecione a mae (receptora/matriz).", tone: "danger" });
                     return;
                   }
 
@@ -370,9 +364,9 @@ export function FieldHomeHubScreen() {
                   reportBirth.mutate(
                     {
                       haras_id: harasId,
-                      mare_id: birthUnknownMare ? null : birthMareId,
-                      mare_name: birthUnknownMare ? "Mae desconhecida" : selectedMare?.name || "Nao informado",
-                      unknown_mare: birthUnknownMare,
+                      mare_id: birthMareId,
+                      mare_name: selectedMare?.name || "Nao informado",
+                      unknown_mare: false,
                       foal_sex: birthSex,
                       photo_uri: birthPhotoUri,
                       note: birthNote.trim() || null,
@@ -385,7 +379,6 @@ export function FieldHomeHubScreen() {
                         setBirthModal(false);
                         setBirthPhotoUri(null);
                         setBirthMareId("");
-                        setBirthUnknownMare(false);
                         setBirthNote("");
                         refresh();
                         setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });

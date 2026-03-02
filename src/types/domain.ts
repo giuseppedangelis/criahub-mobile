@@ -31,6 +31,8 @@ export type AnimalStatus =
   | "emprestado"
   | "em_servico";
 
+export type AnimalEnvironment = "oficial" | "avulsos" | "vinculacao" | "condominio";
+
 export interface UserProfile {
   id: string;
   email: string | null;
@@ -89,6 +91,7 @@ export interface AnimalFilters {
   sex?: AnimalSex;
   category?: AnimalCategory;
   status?: AnimalStatus;
+  environment?: AnimalEnvironment;
 }
 
 export interface PaginationParams {

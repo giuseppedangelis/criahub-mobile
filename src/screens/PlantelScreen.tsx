@@ -21,12 +21,13 @@ import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAnimalsQuery } from "@/src/hooks/useAnimals";
 import { useAppTheme } from "@/src/theme/ThemeContext";
-import type { Animal, AnimalCategory, AnimalSex, AnimalStatus } from "@/src/types/domain";
+import type { Animal, AnimalCategory, AnimalEnvironment, AnimalSex, AnimalStatus } from "@/src/types/domain";
 import { formatCategoryLabel } from "@/src/utils/format";
 
 type SexFilter = AnimalSex | "all";
 type StatusFilter = AnimalStatus | "all";
 type CategoryFilter = AnimalCategory | "all";
+type EnvironmentFilter = AnimalEnvironment;
 
 const PAGE_LIMIT = 20;
 
@@ -49,10 +50,17 @@ const STATUS_OPTIONS: Array<{ label: string; value: StatusFilter }> = [
 const CATEGORY_OPTIONS: Array<{ label: string; value: CategoryFilter }> = [
   { label: "Todas", value: "all" },
   { label: "Potro", value: "potro" },
-  { label: "Potranca", value: "potra" },
+  { label: "Potra", value: "potra" },
   { label: "Garanhão", value: "garanhao" },
   { label: "Égua", value: "egua" },
   { label: "Castrado", value: "castrado" },
+];
+
+const ENVIRONMENT_OPTIONS: Array<{ label: string; value: EnvironmentFilter }> = [
+  { label: "Oficial", value: "oficial" },
+  { label: "Avulsos", value: "avulsos" },
+  { label: "Vinculação", value: "vinculacao" },
+  { label: "Condomínio", value: "condominio" },
 ];
 
 function isCondominioAnimal(owner: string | null) {
@@ -67,6 +75,13 @@ function isCondominioAnimal(owner: string | null) {
 function AnimalItem({ item, onPress }: { item: Animal; onPress: (animalId: string) => void }) {
   const { theme } = useAppTheme();
   const isCondominio = isCondominioAnimal(item.proprietario);
+  const returnDueDate = (() => {
+    if (!item.observations) return null;
+    const match = item.observations.match(/Retorno previsto da hospedagem:\s*(\d{4}-\d{2}-\d{2})/i);
+    if (!match?.[1]) return null;
+    const [year, month, day] = match[1].split("-");
+    return `${day}/${month}/${year}`;
+  })();
 
   return (
     <Pressable onPress={() => onPress(item.id)}>
@@ -82,6 +97,9 @@ function AnimalItem({ item, onPress }: { item: Animal; onPress: (animalId: strin
             ) : null}
             {item.criador ? (
               <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>Criador: {item.criador}</Text>
+            ) : null}
+            {returnDueDate ? (
+              <Text style={[styles.itemSubtitle, { color: theme.colors.textMuted }]}>Retorno hospedagem: {returnDueDate}</Text>
             ) : null}
           </View>
           <View style={styles.itemStatusWrap}>
@@ -163,8 +181,9 @@ export function PlantelScreen() {
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [sexFilter, setSexFilter] = useState<SexFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ativo");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [environmentFilter, setEnvironmentFilter] = useState<EnvironmentFilter>("oficial");
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -178,7 +197,7 @@ export function PlantelScreen() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearchText, sexFilter, statusFilter, categoryFilter]);
+  }, [debouncedSearchText, sexFilter, statusFilter, categoryFilter, environmentFilter]);
 
   const filters = useMemo(
     () => ({
@@ -187,8 +206,9 @@ export function PlantelScreen() {
       sex: sexFilter === "all" ? undefined : sexFilter,
       status: statusFilter === "all" ? undefined : statusFilter,
       category: categoryFilter === "all" ? undefined : categoryFilter,
+      environment: environmentFilter,
     }),
-    [categoryFilter, debouncedSearchText, harasId, sexFilter, statusFilter]
+    [categoryFilter, debouncedSearchText, environmentFilter, harasId, sexFilter, statusFilter]
   );
 
   const { data, isLoading, isFetching, error, refetch } = useAnimalsQuery(
@@ -198,21 +218,32 @@ export function PlantelScreen() {
   );
 
   const items = data?.data ?? [];
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const aHasMedia = (a.images?.length || 0) > 0 || !!a.main_image_url;
+      const bHasMedia = (b.images?.length || 0) > 0 || !!b.main_image_url;
+      if (aHasMedia !== bHasMedia) return aHasMedia ? -1 : 1;
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [items]);
   const totalPages = data?.totalPages ?? 1;
   const total = data?.total ?? 0;
-  const maleCount = items.filter((item) => item.sex === "Macho").length;
-  const femaleCount = items.filter((item) => item.sex === "Fêmea").length;
-  const activeCount = items.filter((item) => item.status === "ativo").length;
-  const condominioCount = items.filter((item) => isCondominioAnimal(item.proprietario)).length;
-  const hasActiveFilters = sexFilter !== "all" || statusFilter !== "all" || categoryFilter !== "all";
+  const maleCount = sortedItems.filter((item) => item.sex === "Macho").length;
+  const femaleCount = sortedItems.filter((item) => item.sex === "Fêmea").length;
+  const activeCount = sortedItems.filter((item) => item.status === "ativo").length;
+  const condominioCount = sortedItems.filter((item) => isCondominioAnimal(item.proprietario)).length;
+  const hasActiveFilters = sexFilter !== "all" || statusFilter !== "ativo" || categoryFilter !== "all" || environmentFilter !== "oficial";
 
   const selectedFiltersText = [
     sexFilter !== "all" ? `Sexo: ${sexFilter}` : null,
-    statusFilter !== "all"
+    statusFilter !== "ativo"
       ? `Status: ${STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label ?? statusFilter}`
       : null,
     categoryFilter !== "all"
       ? `Categoria: ${CATEGORY_OPTIONS.find((option) => option.value === categoryFilter)?.label ?? categoryFilter}`
+      : null,
+    environmentFilter !== "oficial"
+      ? `Ambiente: ${ENVIRONMENT_OPTIONS.find((option) => option.value === environmentFilter)?.label ?? environmentFilter}`
       : null,
   ]
     .filter(Boolean)
@@ -235,8 +266,9 @@ export function PlantelScreen() {
 
   const clearFilters = () => {
     setSexFilter("all");
-    setStatusFilter("all");
+    setStatusFilter("ativo");
     setCategoryFilter("all");
+    setEnvironmentFilter("oficial");
   };
 
   const ListHeader = (
@@ -296,6 +328,20 @@ export function PlantelScreen() {
 
         {showFilters ? (
           <View style={styles.filtersWrapper}>
+            <View style={styles.filterGroup}>
+              <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Ambiente</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {ENVIRONMENT_OPTIONS.map((option) => (
+                  <FilterChip
+                    key={option.value}
+                    label={option.label}
+                    active={environmentFilter === option.value}
+                    onPress={() => setEnvironmentFilter(option.value)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+
             <View style={styles.filterGroup}>
               <Text style={[styles.filterLabel, { color: theme.colors.textMuted }]}>Sexo</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -406,7 +452,7 @@ export function PlantelScreen() {
   return (
     <AppScreen style={styles.screen}>
       <FlatList
-        data={items}
+        data={sortedItems}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         ListHeaderComponent={ListHeader}

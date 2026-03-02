@@ -7,6 +7,7 @@ import {
 import type {
   Animal,
   AnimalCategory,
+  AnimalEnvironment,
   AnimalFilters,
   AnimalRelative,
   AnimalStatus,
@@ -50,6 +51,21 @@ const STATUS_MAPPING_APP_TO_DB: Record<AnimalStatus, string> = {
   em_servico: "Em Servico",
 };
 
+function resolveCategoryByAge(
+  sex: "Macho" | "Fêmea" | null | undefined,
+  birthDate: string | null | undefined,
+  fallback: AnimalCategory
+): AnimalCategory {
+  if (!sex || !birthDate) return fallback;
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return fallback;
+  const today = new Date();
+  const ageInMonths =
+    (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+  if (ageInMonths < 24) return sex === "Fêmea" ? "potra" : "potro";
+  return sex === "Fêmea" ? "egua" : "garanhao";
+}
+
 const ANIMAL_SELECT_FIELDS = `
   id, haras_id, nome, registro, chip, marca,
   sexo, categoria, data_nascimento, pelagem,
@@ -63,6 +79,8 @@ const ANIMAL_SELECT_FIELDS = `
 function mapAnimalFromDb(row: Record<string, any>): Animal {
   const images = Array.isArray(row.images) ? row.images : [];
   const mainImage = row.foto_url || images[0] || null;
+  const mappedCategory = CATEGORY_MAPPING_DB_TO_APP[row.categoria] ?? "potro";
+  const category = resolveCategoryByAge(row.sexo ?? null, row.data_nascimento ?? null, mappedCategory);
 
   return {
     id: row.id,
@@ -72,7 +90,7 @@ function mapAnimalFromDb(row: Record<string, any>): Animal {
     chip_number: row.chip ?? null,
     brand: row.marca ?? null,
     sex: row.sexo,
-    category: CATEGORY_MAPPING_DB_TO_APP[row.categoria] ?? "potro",
+    category,
     birth_date: row.data_nascimento ?? null,
     coat_color: row.pelagem ?? null,
     status: STATUS_MAPPING_DB_TO_APP[row.status] ?? "ativo",
@@ -130,10 +148,56 @@ export const animalsService = {
       return formatPaginatedResponse([], 0, pagination);
     }
 
+    let environmentAnimalIds: string[] | null = null;
+    const environment = filters.environment as AnimalEnvironment | undefined;
+
+    if (environment === "condominio") {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: shares, error: sharesError } = await (supabase as any)
+        .from("animal_ownership_shares")
+        .select("animal_id")
+        .eq("haras_id", filters.haras_id)
+        .or(`end_date.is.null,end_date.gte.${today}`);
+
+      if (sharesError) handleSupabaseError(sharesError);
+
+      environmentAnimalIds = Array.from(new Set((shares || []).map((row: { animal_id: string }) => row.animal_id)));
+      if (environmentAnimalIds.length === 0) {
+        return formatPaginatedResponse([], 0, pagination);
+      }
+    }
+
+    if (environment === "vinculacao") {
+      const { data: queueRows, error: queueError } = await (supabase as any)
+        .from("animal_link_queue")
+        .select("provisional_animal_id")
+        .eq("haras_id", filters.haras_id)
+        .eq("status", "pending");
+
+      if (queueError) handleSupabaseError(queueError);
+
+      environmentAnimalIds = Array.from(new Set((queueRows || []).map((row: { provisional_animal_id: string }) => row.provisional_animal_id)));
+      if (environmentAnimalIds.length === 0) {
+        return formatPaginatedResponse([], 0, pagination);
+      }
+    }
+
     let query = supabase
       .from("animals")
       .select(ANIMAL_SELECT_FIELDS, { count: "exact" })
       .eq("haras_id", filters.haras_id);
+
+    if (environment === "oficial") {
+      query = query.not("abccmm_rowid", "is", null);
+    }
+
+    if (environment === "avulsos") {
+      query = query.is("abccmm_rowid", null);
+    }
+
+    if (environmentAnimalIds && environmentAnimalIds.length > 0) {
+      query = query.in("id", environmentAnimalIds);
+    }
 
     if (filters.search) {
       query = query.or(

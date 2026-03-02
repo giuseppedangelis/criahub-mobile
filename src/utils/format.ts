@@ -11,7 +11,7 @@ export function formatDateBR(value: string | null | undefined): string {
 export function formatCategoryLabel(category: AnimalCategory): string {
   const labels: Record<AnimalCategory, string> = {
     potro: "Potro",
-    potra: "Potranca",
+    potra: "Potra",
     garanhao: "Garanhão",
     egua: "Égua",
     castrado: "Castrado",
