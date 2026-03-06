@@ -26,6 +26,11 @@ function formatDateTime(value: string) {
   return parsed.toLocaleString("pt-BR");
 }
 
+function withFallback(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : fallback;
+}
+
 export function FieldTasksScreen() {
   const { role, harasId, user } = useAuth();
   const { theme } = useAppTheme();
@@ -211,14 +216,16 @@ export function FieldTasksScreen() {
           list.slice(0, 20).map((task) => (
             <View key={task.id} style={[styles.taskRow, { borderColor: theme.colors.border }]}> 
               <View style={styles.rowHeader}>
-                <Text style={{ color: theme.colors.text, fontWeight: "700", flex: 1 }}>{task.title}</Text>
-                <Text style={{ color: statusColor(task.status), fontWeight: "700" }}>{task.status.replaceAll("_", " ")}</Text>
+                <Text style={[styles.taskTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                  {task.title}
+                </Text>
+                <Text style={[styles.taskStatus, { color: statusColor(task.status) }]}>{task.status.replaceAll("_", " ")}</Text>
               </View>
-              <Text style={[styles.line, { color: theme.colors.textMuted }]}>Prazo: {formatDate(task.due_date)}</Text>
-              <Text style={[styles.line, { color: priorityColor(task.priority) }]}>Prioridade: {task.priority}</Text>
-              <Text style={[styles.line, { color: theme.colors.textMuted }]}>{task.animal_name ? `Animal: ${task.animal_name}` : "Sem animal vinculado"}</Text>
+              <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>Prazo: {formatDate(task.due_date)}</Text>
+              <Text style={[styles.line, { color: priorityColor(task.priority) }]} numberOfLines={1}>Prioridade: {task.priority}</Text>
+              <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>Animal: {withFallback(task.animal_name, "Nao vinculado")}</Text>
               {scope === "haras" ? (
-                <Text style={[styles.line, { color: theme.colors.textMuted }]}>Responsavel: {task.responsible_name || "Nao atribuido"}</Text>
+                <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>Responsavel: {withFallback(task.responsible_name, "Nao atribuido")}</Text>
               ) : null}
               <View style={styles.actionsRow}>
                 <AppButton label="Historico" variant="ghost" onPress={() => setHistoryTask({ id: task.id, title: task.title })} />
@@ -339,11 +346,13 @@ const styles = StyleSheet.create({
   },
   rowHeader: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 8,
   },
-  actionsRow: { flexDirection: "row", gap: 8 },
+  taskTitle: { fontWeight: "700", flex: 1, minWidth: 0 },
+  taskStatus: { fontWeight: "700", flexShrink: 0 },
+  actionsRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   modalRoot: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
   modalCard: {

@@ -18,6 +18,11 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function withFallback(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : fallback;
+}
+
 export function CreatorRoutineScreen() {
   const { role, harasId, user } = useAuth();
   const { theme } = useAppTheme();
@@ -158,13 +163,18 @@ export function CreatorRoutineScreen() {
                 { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
               ]}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.taskTitle, { color: theme.colors.text }]}>{task.title}</Text>
-                <Text style={[styles.line, { color: theme.colors.textMuted }]}>
+              <View style={styles.taskMain}>
+                <Text style={[styles.taskTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                  {task.title}
+                </Text>
+                <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>
                   {task.due_date} • {task.status} • {task.priority}
                 </Text>
-                <Text style={[styles.line, { color: theme.colors.textMuted }]}>
-                  {task.animal_name || "Sem animal"} • {task.responsible_name || "Sem responsável"}
+                <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                  Animal: {withFallback(task.animal_name, "Não vinculado")}
+                </Text>
+                <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                  Responsável: {withFallback(task.responsible_name, "Não atribuído")}
                 </Text>
               </View>
               <Text style={[styles.editLabel, { color: theme.colors.primary }]}>Editar</Text>
@@ -227,21 +237,25 @@ export function CreatorRoutineScreen() {
             </View>
 
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Animal (opcional)</Text>
-            <View style={styles.selectWrap}>
-              {animals.slice(0, 40).map((animal) => (
-                <Pressable key={animal.id} onPress={() => setAnimalId(animal.id)} style={[styles.selectItem, { borderColor: animalId === animal.id ? theme.colors.primary : theme.colors.border }]}> 
-                  <Text style={{ color: theme.colors.text }}>{animal.name}</Text>
-                </Pressable>
-              ))}
+            <View style={[styles.selectWrap, { borderColor: theme.colors.border }]}>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={styles.selectContent}>
+                {animals.slice(0, 40).map((animal) => (
+                  <Pressable key={animal.id} onPress={() => setAnimalId(animal.id)} style={[styles.selectItem, { borderColor: animalId === animal.id ? theme.colors.primary : theme.colors.border }]}> 
+                    <Text style={{ color: theme.colors.text }}>{animal.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
 
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Responsável</Text>
-            <View style={styles.selectWrap}>
-              {members.map((member) => (
-                <Pressable key={member.id || "none"} onPress={() => setResponsibleId(member.id)} style={[styles.selectItem, { borderColor: responsibleId === member.id ? theme.colors.primary : theme.colors.border }]}> 
-                  <Text style={{ color: theme.colors.text }}>{member.label}</Text>
-                </Pressable>
-              ))}
+            <View style={[styles.selectWrap, { borderColor: theme.colors.border }]}>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={styles.selectContent}>
+                {members.map((member) => (
+                  <Pressable key={member.id || "none"} onPress={() => setResponsibleId(member.id)} style={[styles.selectItem, { borderColor: responsibleId === member.id ? theme.colors.primary : theme.colors.border }]}> 
+                    <Text style={{ color: theme.colors.text }}>{member.label}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
 
             <TextField label="Observações" value={observations} onChangeText={setObservations} multiline style={styles.textArea} />
@@ -273,8 +287,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  taskMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
   taskTitle: { fontSize: 14, fontWeight: "700" },
-  editLabel: { fontSize: 12, fontWeight: "700" },
+  editLabel: { fontSize: 12, fontWeight: "700", flexShrink: 0 },
   modalRoot: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.58)" },
   modalCard: {
@@ -294,7 +313,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     justifyContent: "center",
   },
-  selectWrap: { gap: 6, maxHeight: 180 },
+  selectWrap: {
+    maxHeight: 180,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 6,
+  },
+  selectContent: { gap: 6 },
   selectItem: {
     borderWidth: 1,
     borderRadius: 10,

@@ -27,3 +27,13 @@ export function useUpdateAgendaStatusMutation(harasId?: string | null) {
     },
   });
 }
+
+export function useCreateAgendaEventMutation(harasId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: agendaService.create,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: agendaKeys.list(harasId || "") });
+    },
+  });
+}

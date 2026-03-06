@@ -862,16 +862,19 @@ export function FieldHomeScreen() {
           filteredTasks.slice(0, 16).map((task) => (
             <View key={task.id} style={[styles.taskRowEnhanced, { borderColor: theme.colors.border }]}> 
               <View style={styles.pendingTopRow}>
-                <Text style={{ color: theme.colors.text, fontWeight: "700", flex: 1 }}>{task.title}</Text>
-                <View style={[styles.statusPill, { borderColor: getTaskStatusColor(task.status) }]}>
+                <Text style={[styles.taskTitle, { color: theme.colors.text }]} numberOfLines={2}>{task.title}</Text>
+                <View style={[styles.statusPill, { borderColor: getTaskStatusColor(task.status) }]}> 
                   <Text style={{ color: getTaskStatusColor(task.status), fontSize: 11, fontWeight: "700" }}>
                     {getTaskStatusLabel(task.status)}
                   </Text>
                 </View>
               </View>
 
-              <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Prazo: {formatDate(task.due_date)}</Text>
-              <Text style={[styles.syncText, { color: getTaskPriorityColor(task.priority) }]}>Prioridade: {getTaskPriorityLabel(task.priority)}</Text>
+              <Text style={[styles.syncText, { color: theme.colors.textMuted }]} numberOfLines={1}>Prazo: {formatDate(task.due_date)}</Text>
+              <Text style={[styles.syncText, { color: getTaskPriorityColor(task.priority) }]} numberOfLines={1}>Prioridade: {getTaskPriorityLabel(task.priority)}</Text>
+              <Text style={[styles.syncText, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                Animal: {task.animal_name?.trim() ? task.animal_name.trim() : "Não vinculado"}
+              </Text>
               {task.last_execution_id ? (
                 <Text style={[styles.syncText, { color: theme.colors.textMuted }]}>Histórico disponível de execução.</Text>
               ) : (
@@ -1255,9 +1258,11 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
+  taskTitle: { fontWeight: "700", flex: 1, minWidth: 0 },
   taskActionsRow: {
     flexDirection: "row",
     gap: 8,
+    flexWrap: "wrap",
   },
   historyRow: {
     borderWidth: 1,

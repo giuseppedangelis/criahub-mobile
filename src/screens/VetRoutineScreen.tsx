@@ -26,6 +26,11 @@ function formatPriority(value: TaskPriority) {
   return "Média";
 }
 
+function withFallback(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : fallback;
+}
+
 export function VetRoutineScreen() {
   const { role, harasId, user } = useAuth();
   const { theme } = useAppTheme();
@@ -165,12 +170,15 @@ export function VetRoutineScreen() {
         ) : tasks.length ? (
           tasks.map((task) => (
             <View key={task.id} style={[styles.taskRow, { borderColor: theme.colors.border }]}> 
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={[styles.taskTitle, { color: theme.colors.text }]}>{task.title}</Text>
-                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]}>
-                  {task.animal_name || "Sem animal"} • {task.due_date}
+              <View style={styles.taskMain}>
+                <Text style={[styles.taskTitle, { color: theme.colors.text }]} numberOfLines={2}>{task.title}</Text>
+                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                  Prazo: {task.due_date}
                 </Text>
-                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]}>
+                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>
+                  Animal: {withFallback(task.animal_name, "Não vinculado")}
+                </Text>
+                <Text style={[styles.taskMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>
                   {formatStatus(task.status)} • {formatPriority(task.priority)}
                 </Text>
               </View>
@@ -242,6 +250,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
+  taskMain: { flex: 1, gap: 2, minWidth: 0 },
   taskTitle: { fontSize: 14, fontWeight: "700" },
   taskMeta: { fontSize: 12 },
   executeLabel: { fontSize: 12, fontWeight: "700" },

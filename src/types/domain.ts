@@ -189,6 +189,19 @@ export interface AgendaEventItem {
   animal_name: string | null;
 }
 
+export interface CreateAgendaEventInput {
+  haras_id: string;
+  titulo: string;
+  data_inicio: string;
+  data_fim?: string | null;
+  tipo?: string;
+  status?: string | null;
+  descricao?: string | null;
+  local?: string | null;
+  responsavel?: string | null;
+  animal_id?: string | null;
+}
+
 export interface VetTaskItem {
   id: string;
   animal_id: string | null;

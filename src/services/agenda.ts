@@ -1,5 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
-import type { AgendaEventItem } from "@/src/types/domain";
+import type { AgendaEventItem, CreateAgendaEventInput } from "@/src/types/domain";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function cacheKey(harasId: string) {
@@ -70,6 +70,28 @@ export const agendaService = {
       .from("events")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", eventId)
+      .select("id")
+      .single();
+
+    if (error) handleSupabaseError(error);
+    return data.id as string;
+  },
+
+  async create(input: CreateAgendaEventInput) {
+    const { data, error } = await supabase
+      .from("events")
+      .insert({
+        haras_id: input.haras_id,
+        titulo: input.titulo,
+        descricao: input.descricao ?? null,
+        data_inicio: input.data_inicio,
+        data_fim: input.data_fim ?? null,
+        tipo: input.tipo ?? "Evento",
+        status: input.status ?? "Pendente",
+        local: input.local ?? null,
+        responsavel: input.responsavel ?? null,
+        animal_id: input.animal_id ?? null,
+      })
       .select("id")
       .single();
 
