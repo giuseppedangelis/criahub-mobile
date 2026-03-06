@@ -34,6 +34,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "NEXT_PUBLIC_SUPABASE_URL": "https://gwibmimaquoesgpbdojo.supabase.co",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3aWJtaW1hcXVvZXNncGJkb2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5NTgyOTksImV4cCI6MjA3OTUzNDI5OX0.pQ0rZSxTXEiFhOo2PaLb6voLQSnCRqm2U5xd0lPV9dM",
+      "router": {},
+      "eas": {
+        "projectId": "4069d525-bbce-4f86-9863-a51ccfe4af32"
+      }
     }
   }
 }
