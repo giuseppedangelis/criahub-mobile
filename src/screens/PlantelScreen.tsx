@@ -275,7 +275,7 @@ export function PlantelScreen() {
     <View style={styles.headerContent}>
       <BrandLogo compact />
       <Card style={styles.heroCard}>
-        <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Plantel</Text>
+        <Text style={[styles.pageTitle, { color: theme.colors.primary }]}>Plantel</Text>
         <Text style={[styles.pageSubtitle, { color: theme.colors.textMuted }]}>Consulta completa dos animais do seu haras.</Text>
 
         <SearchInput
@@ -388,7 +388,7 @@ export function PlantelScreen() {
       </Card>
 
       <View style={styles.summaryHeader}>
-        <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>Visão rápida</Text>
+        <Text style={[styles.summaryTitle, { color: theme.colors.info }]}>Visão rápida</Text>
         <Text style={[styles.summaryHint, { color: theme.colors.textMuted }]}>Página {page} de {totalPages}</Text>
       </View>
 

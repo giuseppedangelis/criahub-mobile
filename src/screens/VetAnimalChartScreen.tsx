@@ -1,6 +1,5 @@
 import { useLayoutEffect, useState } from "react";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Activity, FileText, Pill, ShieldAlert, Weight } from "lucide-react-native";
@@ -28,8 +27,9 @@ import {
   useUpdateVaccineMutation,
 } from "@/src/hooks/useAnimalHealth";
 import { useAnimalQuery } from "@/src/hooks/useAnimals";
-import { isVeterinaryRole } from "@/src/lib/roles";
-import { handleSupabaseError, supabase } from "@/src/services/base";
+import { useVetChartClinicalQuery } from "@/src/hooks/useVetChart";
+import { resolveVetAccess } from "@/src/lib/vet-access";
+import { isCondominioAnimal, todayIsoDate } from "@/src/lib/vet-shared";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type { ExamRecord, HealthRecord, VaccineRecord } from "@/src/types/domain";
 import { formatCategoryLabel, formatDateBR } from "@/src/utils/format";
@@ -44,10 +44,6 @@ const TAB_OPTIONS: Array<{ id: ChartTab; label: string }> = [
   { id: "biometry", label: "Biometria" },
 ];
 
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function normalizeReproType(type: string) {
   const map: Record<string, string> = {
     cobertura: "Cobertura",
@@ -61,15 +57,6 @@ function normalizeReproType(type: string) {
   return map[type] || type;
 }
 
-function isCondominioAnimal(owner: string | null) {
-  if (!owner) return false;
-  const normalized = owner
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
-  return normalized.includes("CONDOMINIO");
-}
-
 export function VetAnimalChartScreen() {
   const { role, harasId } = useAuth();
   const { theme } = useAppTheme();
@@ -77,6 +64,9 @@ export function VetAnimalChartScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const animalId = params.id || "";
+  const vetAccess = resolveVetAccess(role, harasId);
+  const vetHarasId = vetAccess.scopedHarasId;
+  const scopedAnimalId = vetAccess.canLoadVetData ? animalId : "";
 
   const [tab, setTab] = useState<ChartTab>("repro");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -130,11 +120,11 @@ export function VetAnimalChartScreen() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadCurrentFile, setUploadCurrentFile] = useState<string | null>(null);
 
-  const animalQuery = useAnimalQuery(animalId, Boolean(animalId));
-  const proceduresQuery = useAnimalHealthRecords(animalId || null);
-  const vaccinesQuery = useAnimalVaccines(animalId || null);
-  const examsQuery = useAnimalExams(animalId || null);
-  const auditQuery = useHealthAuditLogs(animalId || null);
+  const animalQuery = useAnimalQuery(scopedAnimalId, Boolean(scopedAnimalId));
+  const proceduresQuery = useAnimalHealthRecords(scopedAnimalId || null);
+  const vaccinesQuery = useAnimalVaccines(scopedAnimalId || null);
+  const examsQuery = useAnimalExams(scopedAnimalId || null);
+  const auditQuery = useHealthAuditLogs(scopedAnimalId || null);
 
   const createProcedureMutation = useCreateHealthRecordMutation();
   const createVaccineMutation = useCreateVaccineMutation();
@@ -152,35 +142,7 @@ export function VetAnimalChartScreen() {
       ? [animalQuery.data?.observations || "Atenção clínica registrada"]
       : [];
 
-  const clinicalQuery = useQuery({
-    queryKey: ["vet-chart", "clinical", animalId, harasId],
-    enabled: Boolean(animalId && harasId),
-    queryFn: async () => {
-      const [reproRes, bioRes] = await Promise.all([
-        supabase
-          .from("reproductive_events")
-          .select("id, event_type, event_date, status, observations")
-          .eq("haras_id", harasId as string)
-          .or(`animal_id.eq.${animalId},mare_id.eq.${animalId},stallion_id.eq.${animalId}`)
-          .order("event_date", { ascending: false })
-          .limit(40),
-        supabase
-          .from("animals")
-          .select("weight, height, status_manejo, andamento")
-          .eq("haras_id", harasId as string)
-          .eq("id", animalId)
-          .single(),
-      ]);
-
-      if (reproRes.error) handleSupabaseError(reproRes.error);
-      if (bioRes.error) handleSupabaseError(bioRes.error);
-
-      return {
-        reproductiveEvents: reproRes.data ?? [],
-        biometry: bioRes.data,
-      };
-    },
-  });
+  const clinicalQuery = useVetChartClinicalQuery(vetHarasId, scopedAnimalId || null);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -191,7 +153,7 @@ export function VetAnimalChartScreen() {
     });
   }, [animalQuery.data?.name, navigation, theme.colors.surface, theme.colors.text]);
 
-  if (!isVeterinaryRole(role)) {
+  if (!vetAccess.canAccessVet) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -201,7 +163,17 @@ export function VetAnimalChartScreen() {
     );
   }
 
-  if (!animalId || animalQuery.isLoading) {
+  if (!vetAccess.hasHaras) {
+    return (
+      <AppScreen>
+        <View style={styles.centered}>
+          <EmptyState title="Haras não vinculado" description="Ajuste o vínculo do perfil para abrir o prontuário veterinário." />
+        </View>
+      </AppScreen>
+    );
+  }
+
+  if (!scopedAnimalId || animalQuery.isLoading) {
     return (
       <AppScreen>
         <LoadingState fullscreen message="Carregando prontuário..." />
@@ -227,7 +199,11 @@ export function VetAnimalChartScreen() {
 
   const openVetAction = (action: "exam" | "insemination" | "batch") => {
     setMenuOpen(false);
-    router.push({ pathname: "/(app)/(tabs)/veterinaria", params: { action, animalId } });
+    if (action === "batch") {
+      router.push({ pathname: "/(app)/(tabs)/veterinaria", params: { action, animalId } });
+      return;
+    }
+    router.push({ pathname: "/(app)/(tabs)/reproducao", params: { action, animalId } });
   };
 
   const onAddExamFile = async () => {

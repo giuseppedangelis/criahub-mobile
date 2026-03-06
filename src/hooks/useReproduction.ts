@@ -57,6 +57,7 @@ function useInvalidateReproduction() {
         ? queryClient.invalidateQueries({ queryKey: reproductionKeys.stats(harasId) })
         : Promise.resolve(),
       queryClient.invalidateQueries({ queryKey: ["agenda"] }),
+      queryClient.invalidateQueries({ queryKey: ["vet-chart"] }),
     ]);
   };
 }

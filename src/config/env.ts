@@ -4,8 +4,6 @@ import { z } from "zod";
 const EnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-  SUPABASE_ACCESS_TOKEN: z.string().min(1),
 });
 
 const constantsAny = Constants as unknown as {
@@ -27,10 +25,6 @@ if (!parsed.success) {
 }
 
 const env = parsed.data;
-
-// Mantemos as chaves sensíveis validadas, mas não expostas ao app cliente.
-void env.SUPABASE_SERVICE_ROLE_KEY;
-void env.SUPABASE_ACCESS_TOKEN;
 
 export const publicSupabaseEnv = {
   url: env.NEXT_PUBLIC_SUPABASE_URL,

@@ -51,6 +51,7 @@ function useVeterinaryInvalidate(harasId?: string | null) {
       queryClient.invalidateQueries({ queryKey: veterinaryKeys.sync(harasId) }),
       queryClient.invalidateQueries({ queryKey: ["reproduction"] }),
       queryClient.invalidateQueries({ queryKey: ["agenda"] }),
+      queryClient.invalidateQueries({ queryKey: ["vet-chart"] }),
     ]);
   };
 }

@@ -9,6 +9,7 @@ import {
   type VeterinaryMutationResult,
   writeVeterinaryOfflineQueue,
 } from "@/src/services/veterinary-offline";
+import { mapTaskPriorityFromDb, mapTaskStatusFromDb } from "@/src/lib/vet-shared";
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import type {
   BreedingEventInput,
@@ -27,18 +28,6 @@ function dashboardCacheKey(harasId: string) {
 
 function semenCacheKey(harasId: string) {
   return `@criahub:vet-semen:${harasId}`;
-}
-
-function mapTaskStatusFromDb(status: string | null | undefined) {
-  if (status === "concluida") return "Concluído";
-  if (status === "em_andamento") return "Em andamento";
-  return "Pendente";
-}
-
-function mapTaskPriorityFromDb(priority: string | null | undefined) {
-  if (priority === "alta") return "Alta";
-  if (priority === "baixa") return "Baixa";
-  return "Média";
 }
 
 function formatDateToBR(isoDate: string) {

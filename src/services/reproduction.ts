@@ -1,3 +1,4 @@
+import { mapDbGestationStatus, toDbGestationStatus } from "@/src/lib/vet-shared";
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import type {
   CreateGestationInput,
@@ -22,26 +23,6 @@ async function loadAnimalNames(ids: string[]) {
     map.set(item.id, item.nome);
   }
   return map;
-}
-
-function mapDbGestationStatus(value: string | null | undefined) {
-  if (!value) return "confirmada";
-  const normalized = value.toLowerCase();
-  if (normalized.includes("parto")) return "nascimento";
-  if (normalized.includes("abort")) return "aborto";
-  if (normalized.includes("reabsor")) return "reabsorvida";
-  if (normalized.includes("andamento")) return "em_andamento";
-  return "confirmada";
-}
-
-function toDbGestationStatus(value: string | null | undefined) {
-  if (!value) return "Em andamento";
-  const normalized = value.toLowerCase();
-  if (normalized === "nascimento") return "Parto realizado";
-  if (normalized === "aborto") return "Abortada";
-  if (normalized === "reabsorvida") return "Reabsorvida";
-  if (normalized === "confirmada" || normalized === "em_andamento") return "Em andamento";
-  return value;
 }
 
 export const reproductionService = {

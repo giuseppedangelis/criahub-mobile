@@ -22,6 +22,14 @@ function formatTime(value: string | null) {
   return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
+function getStatusTone(status: string | null | undefined) {
+  const normalized = (status || "").toLowerCase();
+  if (normalized.includes("concl")) return "success" as const;
+  if (normalized.includes("cancel")) return "danger" as const;
+  if (normalized.includes("andamento")) return "info" as const;
+  return "warning" as const;
+}
+
 export function AgendaScreen() {
   const { role, harasId, profile } = useAuth();
   const { theme } = useAppTheme();
@@ -142,8 +150,8 @@ export function AgendaScreen() {
 
       <Card>
         <View style={styles.row}>
-          <CalendarDays size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Próximos eventos</Text>
+          <CalendarDays size={18} color={theme.colors.info} />
+          <Text style={[styles.cardTitle, { color: theme.colors.info }]}>Próximos eventos</Text>
         </View>
 
         {message ? (
@@ -171,32 +179,46 @@ export function AgendaScreen() {
             {error instanceof Error ? error.message : "Falha ao carregar agenda."}
           </Text>
         ) : data && data.length > 0 ? (
-          data.slice(0, 14).map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => setSelectedEvent(item)}
-              style={({ pressed }) => [
-                styles.itemRow,
-                {
-                  borderColor: theme.colors.border,
-                  opacity: pressed ? 0.78 : 1,
-                },
-              ]}
-            >
-              <View style={styles.itemMain}>
-                <Text style={[styles.itemTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                  {item.titulo}
-                </Text>
-                <Text style={[styles.itemType, { color: theme.colors.textMuted }]}> 
-                  {item.tipo} {item.animal_name ? `• ${item.animal_name}` : ""}
-                </Text>
-                <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}> 
-                  {formatDateBR(item.data_inicio)} às {formatTime(item.data_inicio)}
-                </Text>
-              </View>
-              <Text style={[styles.itemTime, { color: theme.colors.text }]} numberOfLines={1}>{item.status || "-"}</Text>
-            </Pressable>
-          ))
+          data.slice(0, 14).map((item) => {
+            const tone = getStatusTone(item.status);
+            const accent =
+              tone === "success"
+                ? theme.colors.success
+                : tone === "danger"
+                ? theme.colors.danger
+                : tone === "info"
+                ? theme.colors.info
+                : theme.colors.warning;
+
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setSelectedEvent(item)}
+                style={({ pressed }) => [
+                  styles.itemRow,
+                  {
+                    borderColor: theme.colors.border,
+                    opacity: pressed ? 0.78 : 1,
+                  },
+                ]}
+              >
+                <View style={styles.itemMain}>
+                  <Text style={[styles.itemTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                    {item.titulo}
+                  </Text>
+                  <Text style={[styles.itemType, { color: theme.colors.textMuted }]}> 
+                    {item.tipo} {item.animal_name ? `• ${item.animal_name}` : ""}
+                  </Text>
+                  <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}> 
+                    {formatDateBR(item.data_inicio)} às {formatTime(item.data_inicio)}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { borderColor: accent }]}> 
+                  <Text style={[styles.statusBadgeLabel, { color: accent }]} numberOfLines={1}>{item.status || "-"}</Text>
+                </View>
+              </Pressable>
+            );
+          })
         ) : (
           <Text style={[styles.line, { color: theme.colors.textMuted }]}>Nenhum evento encontrado.</Text>
         )}
@@ -205,7 +227,7 @@ export function AgendaScreen() {
       <Card>
         <View style={styles.row}>
           <PlusCircle size={18} color={theme.colors.info} />
-          <Text style={[styles.hintTitle, { color: theme.colors.text }]}>Planejamento mobile</Text>
+          <Text style={[styles.hintTitle, { color: theme.colors.info }]}>Planejamento mobile</Text>
         </View>
         <Text style={[styles.hintText, { color: theme.colors.textMuted }]}> 
           Agenda conectada aos eventos do haras. Toque em um evento para marcar o status de execução.
@@ -388,6 +410,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     maxWidth: 96,
   },
+  statusBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusBadgeLabel: { fontSize: 11, fontWeight: "700" },
   line: {
     fontSize: 13,
   },

@@ -23,6 +23,18 @@ function withFallback(value: string | null | undefined, fallback: string) {
   return normalized && normalized.length > 0 ? normalized : fallback;
 }
 
+function getStatusAccent(status: TaskStatus) {
+  if (status === "concluida") return "success" as const;
+  if (status === "em_andamento") return "info" as const;
+  return "warning" as const;
+}
+
+function getPriorityAccent(priority: TaskPriority) {
+  if (priority === "alta") return "danger" as const;
+  if (priority === "media") return "warning" as const;
+  return "success" as const;
+}
+
 export function CreatorRoutineScreen() {
   const { role, harasId, user } = useAuth();
   const { theme } = useAppTheme();
@@ -45,6 +57,15 @@ export function CreatorRoutineScreen() {
   const [responsibleId, setResponsibleId] = useState("");
 
   const animals = animalsQuery.data?.data ?? [];
+  const summary = useMemo(() => {
+    const list = tasksQuery.data ?? [];
+    return {
+      pending: list.filter((item) => item.status === "pendente").length,
+      inProgress: list.filter((item) => item.status === "em_andamento").length,
+      done: list.filter((item) => item.status === "concluida").length,
+    };
+  }, [tasksQuery.data]);
+
   const members = useMemo(() => {
     const list = membersQuery.data ?? [];
     return [{ id: "", label: "Sem responsável" }, ...list.map((item) => ({ id: item.id, label: item.full_name || item.email || item.role }))];
@@ -150,6 +171,21 @@ export function CreatorRoutineScreen() {
         <AppButton label="Nova tarefa" onPress={openCreate} />
       </Card>
 
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryBox, { backgroundColor: `${theme.colors.warning}1A`, borderColor: `${theme.colors.warning}55` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Pendentes</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{summary.pending}</Text>
+        </View>
+        <View style={[styles.summaryBox, { backgroundColor: `${theme.colors.info}1A`, borderColor: `${theme.colors.info}55` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Em andamento</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{summary.inProgress}</Text>
+        </View>
+        <View style={[styles.summaryBox, { backgroundColor: `${theme.colors.success}1A`, borderColor: `${theme.colors.success}55` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Concluídas</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{summary.done}</Text>
+        </View>
+      </View>
+
       <Card>
         {tasksQuery.isLoading ? (
           <Text style={[styles.line, { color: theme.colors.textMuted }]}>Carregando tarefas...</Text>
@@ -168,8 +204,68 @@ export function CreatorRoutineScreen() {
                   {task.title}
                 </Text>
                 <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>
-                  {task.due_date} • {task.status} • {task.priority}
+                  Prazo: {task.due_date}
                 </Text>
+                <View style={styles.taskBadgesRow}>
+                  <View
+                    style={[
+                      styles.taskBadge,
+                      {
+                        borderColor:
+                          getStatusAccent(task.status) === "success"
+                            ? theme.colors.success
+                            : getStatusAccent(task.status) === "info"
+                            ? theme.colors.info
+                            : theme.colors.warning,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.taskBadgeLabel,
+                        {
+                          color:
+                            getStatusAccent(task.status) === "success"
+                              ? theme.colors.success
+                              : getStatusAccent(task.status) === "info"
+                              ? theme.colors.info
+                              : theme.colors.warning,
+                        },
+                      ]}
+                    >
+                      {task.status.replaceAll("_", " ")}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.taskBadge,
+                      {
+                        borderColor:
+                          getPriorityAccent(task.priority) === "danger"
+                            ? theme.colors.danger
+                            : getPriorityAccent(task.priority) === "warning"
+                            ? theme.colors.warning
+                            : theme.colors.success,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.taskBadgeLabel,
+                        {
+                          color:
+                            getPriorityAccent(task.priority) === "danger"
+                              ? theme.colors.danger
+                              : getPriorityAccent(task.priority) === "warning"
+                              ? theme.colors.warning
+                              : theme.colors.success,
+                        },
+                      ]}
+                    >
+                      {task.priority}
+                    </Text>
+                  </View>
+                </View>
                 <Text style={[styles.line, { color: theme.colors.textMuted }]} numberOfLines={1}>
                   Animal: {withFallback(task.animal_name, "Não vinculado")}
                 </Text>
@@ -276,6 +372,16 @@ const styles = StyleSheet.create({
   header: { gap: 6 },
   title: { fontSize: 28, fontWeight: "700" },
   subtitle: { fontSize: 14, lineHeight: 20 },
+  summaryRow: { flexDirection: "row", gap: 8 },
+  summaryBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    gap: 4,
+  },
+  summaryLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  summaryValue: { fontSize: 20, fontWeight: "700" },
   line: { fontSize: 12 },
   taskRow: {
     borderWidth: 1,
@@ -293,6 +399,16 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   taskTitle: { fontSize: 14, fontWeight: "700" },
+  taskBadgesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  taskBadge: {
+    borderWidth: 1,
+    minHeight: 24,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  taskBadgeLabel: { fontSize: 10, fontWeight: "700", textTransform: "capitalize" },
   editLabel: { fontSize: 12, fontWeight: "700", flexShrink: 0 },
   modalRoot: { flex: 1, justifyContent: "flex-end" },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.58)" },

@@ -1,6 +1,7 @@
 import { Activity, Baby, Plus } from "lucide-react-native";
+import { useLocalSearchParams } from "expo-router";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { AppScreen } from "@/src/components/ui/AppScreen";
@@ -18,7 +19,12 @@ import {
   useReproductiveEventsQuery,
   useUpdateGestationStatusMutation,
 } from "@/src/hooks/useReproduction";
-import { isVeterinaryRole } from "@/src/lib/roles";
+import { resolveVetAccess } from "@/src/lib/vet-access";
+import {
+  normalizeGestationStatus,
+  normalizeReproductionEventStatus,
+  todayIsoDate,
+} from "@/src/lib/vet-shared";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import { formatDateBR } from "@/src/utils/format";
 
@@ -53,34 +59,26 @@ function normalizeEventType(value: string) {
   return map[value] || value;
 }
 
-function normalizeEventStatus(value: string | null | undefined) {
-  const normalized = (value || "").toLowerCase();
-  if (normalized.includes("concl")) return "concluido";
-  if (normalized.includes("confirm")) return "confirmado";
-  if (normalized.includes("andamento")) return "confirmado";
-  return "pendente";
-}
-
-function normalizeGestationStatus(value: string | null | undefined) {
-  const normalized = (value || "").toLowerCase();
-  if (normalized.includes("nasc") || normalized.includes("parto")) {
-    return "nascimento";
-  }
-  if (normalized.includes("abort")) return "aborto";
-  if (normalized.includes("reabsor")) return "reabsorvida";
-  if (normalized.includes("confirm")) return "confirmada";
-  return "em_andamento";
-}
-
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function inferMareName(item: {
   mare_name: string | null;
   animal_name: string | null;
 }) {
   return item.mare_name || item.animal_name;
+}
+
+function eventAccent(status: string | null | undefined) {
+  const normalized = normalizeReproductionEventStatus(status);
+  if (normalized === "concluido") return "success" as const;
+  if (normalized === "confirmado") return "info" as const;
+  return "warning" as const;
+}
+
+function gestationAccent(status: string | null | undefined) {
+  const normalized = normalizeGestationStatus(status);
+  if (normalized === "aborto") return "danger" as const;
+  if (normalized === "nascimento") return "success" as const;
+  if (normalized === "confirmada") return "info" as const;
+  return "warning" as const;
 }
 
 function AnimalPicker({
@@ -142,24 +140,27 @@ function AnimalPicker({
 }
 
 export function VetReproductionScreen() {
+  const params = useLocalSearchParams<{ action?: string; animalId?: string }>();
   const { role, harasId, profile } = useAuth();
   const { theme } = useAppTheme();
+  const vetAccess = resolveVetAccess(role, harasId);
+  const vetHarasId = vetAccess.scopedHarasId;
 
-  const eventsQuery = useReproductiveEventsQuery(harasId);
-  const gestationsQuery = useGestationsQuery(harasId);
-  const statsQuery = useReproductionStatsQuery(harasId);
+  const eventsQuery = useReproductiveEventsQuery(vetHarasId);
+  const gestationsQuery = useGestationsQuery(vetHarasId);
+  const statsQuery = useReproductionStatsQuery(vetHarasId);
   const createEventMutation = useCreateReproductiveEventMutation();
   const createGestationMutation = useCreateGestationMutation();
   const updateGestationStatusMutation = useUpdateGestationStatusMutation();
   const maresQuery = useAnimalsQuery(
-    { haras_id: harasId ?? undefined, sex: "Fêmea", status: "ativo" },
+    { haras_id: vetHarasId ?? undefined, sex: "Fêmea", status: "ativo" },
     { page: 1, limit: 200 },
-    isVeterinaryRole(role),
+    vetAccess.canLoadVetData,
   );
   const stallionsQuery = useAnimalsQuery(
-    { haras_id: harasId ?? undefined, sex: "Macho", status: "ativo" },
+    { haras_id: vetHarasId ?? undefined, sex: "Macho", status: "ativo" },
     { page: 1, limit: 200 },
-    isVeterinaryRole(role),
+    vetAccess.canLoadVetData,
   );
 
   const [eventModalOpen, setEventModalOpen] = useState(false);
@@ -241,7 +242,22 @@ export function VetReproductionScreen() {
     setGestationNotes("");
   };
 
-  if (!isVeterinaryRole(role)) {
+  useEffect(() => {
+    if (!params.action) return;
+    if (params.animalId) {
+      const value = String(params.animalId);
+      setEventMareId(value);
+      setGestationMareId(value);
+    }
+    if (params.action === "exam" || params.action === "insemination") {
+      setEventModalOpen(true);
+      if (params.action === "insemination") {
+        setEventType("inseminacao");
+      }
+    }
+  }, [params.action, params.animalId]);
+
+  if (!vetAccess.canAccessVet) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -254,7 +270,7 @@ export function VetReproductionScreen() {
     );
   }
 
-  if (!harasId) {
+  if (!vetAccess.hasHaras) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -273,7 +289,7 @@ export function VetReproductionScreen() {
   const filteredEvents = useMemo(() => {
     if (eventFilter === "all") return events;
     return events.filter(
-      (item) => normalizeEventStatus(item.status) === eventFilter,
+      (item) => normalizeReproductionEventStatus(item.status) === eventFilter,
     );
   }, [eventFilter, events]);
   const filteredGestations = useMemo(() => {
@@ -302,33 +318,21 @@ export function VetReproductionScreen() {
       ) : null}
 
       <View style={styles.summaryGrid}>
-        <Card style={styles.summaryCard}>
-          <Text
-            style={[styles.summaryLabel, { color: theme.colors.textMuted }]}
-          >
-            Eventos
-          </Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+        <Card style={[styles.summaryCard, { borderColor: `${theme.colors.info}55`, backgroundColor: `${theme.colors.info}14` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Eventos</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}> 
             {stats?.total_events ?? events.length}
           </Text>
         </Card>
-        <Card style={styles.summaryCard}>
-          <Text
-            style={[styles.summaryLabel, { color: theme.colors.textMuted }]}
-          >
-            Gestações
-          </Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+        <Card style={[styles.summaryCard, { borderColor: `${theme.colors.primary}55`, backgroundColor: `${theme.colors.primary}14` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Gestações</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}> 
             {stats?.total_gestations ?? gestations.length}
           </Text>
         </Card>
-        <Card style={styles.summaryCard}>
-          <Text
-            style={[styles.summaryLabel, { color: theme.colors.textMuted }]}
-          >
-            Ativas
-          </Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+        <Card style={[styles.summaryCard, { borderColor: `${theme.colors.success}55`, backgroundColor: `${theme.colors.success}14` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Ativas</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}> 
             {stats?.active_gestations ?? 0}
           </Text>
         </Card>
@@ -337,7 +341,7 @@ export function VetReproductionScreen() {
       <Card>
         <View style={styles.row}>
           <Plus size={18} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.primary }]}> 
             Novo registro reprodutivo
           </Text>
         </View>
@@ -356,8 +360,8 @@ export function VetReproductionScreen() {
 
       <Card>
         <View style={styles.row}>
-          <Activity size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          <Activity size={18} color={theme.colors.info} />
+          <Text style={[styles.cardTitle, { color: theme.colors.info }]}> 
             Eventos Reprodutivos
           </Text>
         </View>
@@ -397,34 +401,36 @@ export function VetReproductionScreen() {
         ) : eventsQuery.error ? (
           <Text style={[styles.emptyText, { color: theme.colors.danger }]}>Não foi possível carregar eventos.</Text>
         ) : filteredEvents.length ? (
-          filteredEvents.slice(0, 20).map((item) => (
-            <View
-              key={item.id}
-              style={[styles.listRow, { borderColor: theme.colors.border }]}
-            >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
-                  {normalizeEventType(item.event_type)}
-                </Text>
-                <Text
-                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
-                >
-                  {formatDateBR(item.event_date)} • Égua:{" "}
-                  {inferMareName(item) || "-"}
-                </Text>
-                <Text
-                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
-                >
-                  Garanhão: {item.stallion_name || "-"}
-                </Text>
-              </View>
-              <Text
-                style={[styles.rowStatus, { color: theme.colors.textMuted }]}
+          filteredEvents.slice(0, 20).map((item) => {
+            const tone = eventAccent(item.status);
+            const accent = tone === "success" ? theme.colors.success : tone === "info" ? theme.colors.info : theme.colors.warning;
+            return (
+              <View
+                key={item.id}
+                style={[styles.listRow, { borderColor: theme.colors.border }]}
               >
-                {item.status || "-"}
-              </Text>
-            </View>
-          ))
+                <View style={styles.rowMain}>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
+                    {normalizeEventType(item.event_type)}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                  >
+                    {formatDateBR(item.event_date)} • Égua:{" "}
+                    {inferMareName(item) || "-"}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                  >
+                    Garanhão: {item.stallion_name || "-"}
+                  </Text>
+                </View>
+                <View style={[styles.statusPill, { borderColor: accent }]}> 
+                  <Text style={[styles.statusPillLabel, { color: accent }]}>{item.status || "-"}</Text>
+                </View>
+              </View>
+            );
+          })
         ) : (
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
             Nenhum evento reprodutivo.
@@ -434,8 +440,8 @@ export function VetReproductionScreen() {
 
       <Card>
         <View style={styles.row}>
-          <Baby size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          <Baby size={18} color={theme.colors.success} />
+          <Text style={[styles.cardTitle, { color: theme.colors.success }]}> 
             Gestações
           </Text>
         </View>
@@ -476,44 +482,42 @@ export function VetReproductionScreen() {
         ) : gestationsQuery.error ? (
           <Text style={[styles.emptyText, { color: theme.colors.danger }]}>Não foi possível carregar gestações.</Text>
         ) : filteredGestations.length ? (
-          filteredGestations.slice(0, 20).map((item) => (
-            <View
-              key={item.id}
-              style={[styles.listRow, { borderColor: theme.colors.border }]}
-            >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
-                  Égua: {item.egua_name || "-"}
-                </Text>
-                <Text
-                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
-                >
-                  Diagnóstico: {formatDateBR(item.data_diagnostico)}
-                </Text>
-                <Text
-                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
-                >
-                  Garanhão: {item.garanhao_name || "-"}
-                </Text>
-                <Text
-                  style={[styles.rowMeta, { color: theme.colors.textMuted }]}
-                >
-                  Parto previsto: {formatDateBR(item.data_prevista_parto)}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() =>
-                  setStatusModal({ id: item.id })
-                }
+          filteredGestations.slice(0, 20).map((item) => {
+            const tone = gestationAccent(item.status);
+            const accent = tone === "danger" ? theme.colors.danger : tone === "success" ? theme.colors.success : tone === "info" ? theme.colors.info : theme.colors.warning;
+            return (
+              <View
+                key={item.id}
+                style={[styles.listRow, { borderColor: theme.colors.border }]}
               >
-                <Text
-                  style={[styles.rowStatus, { color: theme.colors.primary }]}
-                >
-                  {item.status || "-"}
-                </Text>
-              </Pressable>
-            </View>
-          ))
+                <View style={styles.rowMain}>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
+                    Égua: {item.egua_name || "-"}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                  >
+                    Diagnóstico: {formatDateBR(item.data_diagnostico)}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                  >
+                    Garanhão: {item.garanhao_name || "-"}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, { color: theme.colors.textMuted }]}
+                  >
+                    Parto previsto: {formatDateBR(item.data_prevista_parto)}
+                  </Text>
+                </View>
+                <Pressable onPress={() => setStatusModal({ id: item.id })}>
+                  <View style={[styles.statusPill, { borderColor: accent }]}> 
+                    <Text style={[styles.statusPillLabel, { color: accent }]}>{item.status || "-"}</Text>
+                  </View>
+                </Pressable>
+              </View>
+            );
+          })
         ) : (
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>
             Nenhuma gestação cadastrada.
@@ -635,10 +639,10 @@ export function VetReproductionScreen() {
                 loading={createEventMutation.isPending}
                 disabled={!eventMareId.trim()}
                 onPress={() => {
-                  if (!harasId || !eventMareId.trim()) return;
+                  if (!vetHarasId || !eventMareId.trim()) return;
                   createEventMutation.mutate(
                     {
-                      haras_id: harasId,
+                      haras_id: vetHarasId,
                       animal_id: eventMareId.trim(),
                       mare_id: eventMareId.trim(),
                       stallion_id: eventStallionId.trim() || null,
@@ -777,10 +781,10 @@ export function VetReproductionScreen() {
                 loading={createGestationMutation.isPending}
                 disabled={!gestationMareId.trim()}
                 onPress={() => {
-                  if (!harasId || !gestationMareId.trim()) return;
+                  if (!vetHarasId || !gestationMareId.trim()) return;
                   createGestationMutation.mutate(
                     {
-                      haras_id: harasId,
+                      haras_id: vetHarasId,
                       mare_id: gestationMareId.trim(),
                       stallion_id: gestationStallionId.trim() || null,
                       start_date: gestationStartDate,
@@ -956,6 +960,15 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 14, fontWeight: "600" },
   rowMeta: { fontSize: 12 },
   rowStatus: { fontSize: 12, fontWeight: "700" },
+  statusPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 24,
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusPillLabel: { fontSize: 11, fontWeight: "700" },
   emptyText: { fontSize: 13 },
   inputLabel: { fontSize: 14, fontWeight: "600" },
   helperText: { fontSize: 12 },

@@ -37,3 +37,17 @@ export function useCreateAgendaEventMutation(harasId?: string | null) {
     },
   });
 }
+
+export function useConvertAgendaEventToTaskMutation(harasId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: agendaService.convertEventToTask,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agendaKeys.list(harasId || "") }),
+        queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["veterinary"] }),
+      ]);
+    },
+  });
+}

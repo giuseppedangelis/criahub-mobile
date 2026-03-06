@@ -202,6 +202,13 @@ export interface CreateAgendaEventInput {
   animal_id?: string | null;
 }
 
+export interface ConvertAgendaEventToTaskInput {
+  event_id: string;
+  haras_id: string;
+  created_by?: string | null;
+  responsible_id?: string | null;
+}
+
 export interface VetTaskItem {
   id: string;
   animal_id: string | null;

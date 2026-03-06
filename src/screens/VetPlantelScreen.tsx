@@ -9,32 +9,25 @@ import { EmptyState } from "@/src/components/ui/EmptyState";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAnimalsQuery } from "@/src/hooks/useAnimals";
-import { isVeterinaryRole } from "@/src/lib/roles";
+import { resolveVetAccess } from "@/src/lib/vet-access";
+import { isCondominioAnimal } from "@/src/lib/vet-shared";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import { formatCategoryLabel } from "@/src/utils/format";
-
-function isCondominioAnimal(owner: string | null) {
-  if (!owner) return false;
-  const normalized = owner
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase();
-  return normalized.includes("CONDOMINIO");
-}
 
 export function VetPlantelScreen() {
   const { role, harasId } = useAuth();
   const { theme } = useAppTheme();
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const vetAccess = resolveVetAccess(role, harasId);
 
   const query = useAnimalsQuery(
-    { haras_id: harasId ?? undefined, status: "ativo", search },
+    { haras_id: vetAccess.scopedHarasId ?? undefined, status: "ativo", search },
     { page: 1, limit: 120 },
-    Boolean(harasId)
+    vetAccess.canLoadVetData
   );
 
-  if (!isVeterinaryRole(role)) {
+  if (!vetAccess.canAccessVet) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -44,7 +37,7 @@ export function VetPlantelScreen() {
     );
   }
 
-  if (!harasId) {
+  if (!vetAccess.hasHaras) {
     return (
       <AppScreen>
         <View style={styles.centered}>

@@ -1,5 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
-import type { AgendaEventItem, CreateAgendaEventInput } from "@/src/types/domain";
+import type { AgendaEventItem, ConvertAgendaEventToTaskInput, CreateAgendaEventInput } from "@/src/types/domain";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function cacheKey(harasId: string) {
@@ -91,6 +91,37 @@ export const agendaService = {
         local: input.local ?? null,
         responsavel: input.responsavel ?? null,
         animal_id: input.animal_id ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (error) handleSupabaseError(error);
+    return data.id as string;
+  },
+
+  async convertEventToTask(input: ConvertAgendaEventToTaskInput) {
+    const { data: eventRow, error: eventError } = await supabase
+      .from("events")
+      .select("id, titulo, descricao, data_inicio, animal_id")
+      .eq("id", input.event_id)
+      .eq("haras_id", input.haras_id)
+      .single();
+
+    if (eventError) handleSupabaseError(eventError);
+
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert({
+        haras_id: input.haras_id,
+        title: eventRow.titulo,
+        due_date: String(eventRow.data_inicio).slice(0, 10),
+        status: "pendente",
+        priority: "media",
+        observations: eventRow.descricao ?? null,
+        animal_id: eventRow.animal_id ?? null,
+        responsible_id: input.responsible_id ?? null,
+        created_by: input.created_by ?? null,
+        task_type: "evento_agenda",
       })
       .select("id")
       .single();

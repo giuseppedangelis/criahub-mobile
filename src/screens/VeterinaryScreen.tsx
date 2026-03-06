@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Activity,
   CalendarDays,
@@ -37,15 +37,12 @@ import {
   useVeterinaryDashboardQuery,
   useVeterinarySyncSnapshotQuery,
 } from "@/src/hooks/useVeterinary";
-import { isVeterinaryRole } from "@/src/lib/roles";
+import { resolveVetAccess } from "@/src/lib/vet-access";
+import { todayIsoDate } from "@/src/lib/vet-shared";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 
 const EDEMA_OPTIONS = [0, 1, 2, 3, 4];
 const CERVIX_OPTIONS = [0, 1, 2, 3];
-
-function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function parseOptionalNumber(value: string) {
   if (!value.trim()) return null;
@@ -141,36 +138,38 @@ function QuickKpi({ label, value }: { label: string; value: string }) {
 
 export function VeterinaryScreen() {
   const params = useLocalSearchParams<{ action?: string; animalId?: string }>();
+  const router = useRouter();
   const { role, harasId, user, profile } = useAuth();
   const { theme } = useAppTheme();
-  const canAccess = isVeterinaryRole(role);
+  const vetAccess = resolveVetAccess(role, harasId);
+  const vetHarasId = vetAccess.scopedHarasId;
 
-  const dashboardQuery = useVeterinaryDashboardQuery(harasId);
-  const healthSummaryQuery = useHealthSummary(harasId);
-  const semenQuery = useSemenInventoryQuery(harasId);
-  const syncSnapshotQuery = useVeterinarySyncSnapshotQuery(harasId);
+  const dashboardQuery = useVeterinaryDashboardQuery(vetHarasId);
+  const healthSummaryQuery = useHealthSummary(vetHarasId);
+  const semenQuery = useSemenInventoryQuery(vetHarasId);
+  const syncSnapshotQuery = useVeterinarySyncSnapshotQuery(vetHarasId);
   const femalesQuery = useAnimalsQuery(
-    { haras_id: harasId ?? undefined, sex: "Fêmea", status: "ativo" },
+    { haras_id: vetHarasId ?? undefined, sex: "Fêmea", status: "ativo" },
     { page: 1, limit: 160 },
-    canAccess,
+    vetAccess.canLoadVetData,
   );
   const stallionsQuery = useAnimalsQuery(
-    { haras_id: harasId ?? undefined, sex: "Macho", status: "ativo" },
+    { haras_id: vetHarasId ?? undefined, sex: "Macho", status: "ativo" },
     { page: 1, limit: 120 },
-    canAccess,
+    vetAccess.canLoadVetData,
   );
   const allAnimalsQuery = useAnimalsQuery(
-    { haras_id: harasId ?? undefined, status: "ativo" },
+    { haras_id: vetHarasId ?? undefined, status: "ativo" },
     { page: 1, limit: 260 },
-    canAccess,
+    vetAccess.canLoadVetData,
   );
 
-  const createExamMutation = useCreateReproductiveExamMutation(harasId);
-  const createBreedingMutation = useCreateBreedingEventMutation(harasId);
-  const createBatchMutation = useCreateHealthBatchMutation(harasId);
-  const addSemenMutation = useAddSemenEntryMutation(harasId);
-  const createTreatmentMutation = useCreateTreatmentMutation(harasId);
-  const flushQueueMutation = useFlushVetQueueMutation(harasId);
+  const createExamMutation = useCreateReproductiveExamMutation(vetHarasId);
+  const createBreedingMutation = useCreateBreedingEventMutation(vetHarasId);
+  const createBatchMutation = useCreateHealthBatchMutation(vetHarasId);
+  const addSemenMutation = useAddSemenEntryMutation(vetHarasId);
+  const createTreatmentMutation = useCreateTreatmentMutation(vetHarasId);
+  const flushQueueMutation = useFlushVetQueueMutation(vetHarasId);
 
   const [message, setMessage] = useState<{
     text: string;
@@ -239,7 +238,7 @@ export function VeterinaryScreen() {
   const [treatmentFormError, setTreatmentFormError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canAccess) return;
+    if (!vetAccess.canLoadVetData) return;
     flushQueueMutation.mutate(undefined, {
       onSuccess: (flushed) => {
         if (flushed > 0) {
@@ -250,17 +249,23 @@ export function VeterinaryScreen() {
         }
       },
     });
-  }, [canAccess]);
+  }, [vetAccess.canLoadVetData]);
 
   useEffect(() => {
     if (!params.action) return;
     if (params.action === "exam") {
-      setExamModalOpen(true);
-      if (params.animalId) setExamAnimalId(String(params.animalId));
+      router.push({
+        pathname: "/(app)/(tabs)/reproducao",
+        params: params.animalId ? { animalId: String(params.animalId), action: "exam" } : undefined,
+      });
+      return;
     }
     if (params.action === "insemination") {
-      setInseminationModalOpen(true);
-      if (params.animalId) setMareId(String(params.animalId));
+      router.push({
+        pathname: "/(app)/(tabs)/reproducao",
+        params: params.animalId ? { animalId: String(params.animalId), action: "insemination" } : undefined,
+      });
+      return;
     }
     if (params.action === "batch") {
       setBatchModalOpen(true);
@@ -269,15 +274,28 @@ export function VeterinaryScreen() {
         setBatchSelected((prev) => ({ ...prev, [id]: true }));
       }
     }
-  }, [params.action, params.animalId]);
+  }, [params.action, params.animalId, router]);
 
-  if (!canAccess) {
+  if (!vetAccess.canAccessVet) {
     return (
       <AppScreen>
         <View style={styles.centered}>
           <EmptyState
             title="Módulo veterinário"
             description="Disponível apenas para o perfil de Veterinária."
+          />
+        </View>
+      </AppScreen>
+    );
+  }
+
+  if (!vetAccess.hasHaras) {
+    return (
+      <AppScreen>
+        <View style={styles.centered}>
+          <EmptyState
+            title="Haras não vinculado"
+            description="Seu perfil veterinário está sem haras ativo. Ajuste o vínculo para carregar o módulo."
           />
         </View>
       </AppScreen>
@@ -310,7 +328,7 @@ export function VeterinaryScreen() {
   );
 
   const onSaveExam = () => {
-    if (!harasId || !examAnimalId) {
+    if (!vetHarasId || !examAnimalId) {
       setMessage({
         text: "Selecione a matriz para registrar o exame.",
         tone: "danger",
@@ -329,7 +347,7 @@ export function VeterinaryScreen() {
 
     createExamMutation.mutate(
       {
-        haras_id: harasId,
+        haras_id: vetHarasId,
         animal_id: examAnimalId,
         follicle_right_size: right,
         follicle_left_size: left,
@@ -365,7 +383,7 @@ export function VeterinaryScreen() {
   };
 
   const onSaveBreeding = () => {
-    if (!harasId || !mareId || !stallionId) {
+    if (!vetHarasId || !mareId || !stallionId) {
       setMessage({ text: "Selecione matriz e garanhão.", tone: "danger" });
       return;
     }
@@ -384,7 +402,7 @@ export function VeterinaryScreen() {
 
     createBreedingMutation.mutate(
       {
-        haras_id: harasId,
+        haras_id: vetHarasId,
         mare_id: mareId,
         stallion_id: stallionId,
         method,
@@ -419,7 +437,7 @@ export function VeterinaryScreen() {
   };
 
   const onSaveBatch = () => {
-    if (!harasId || !batchProcedureName.trim()) {
+    if (!vetHarasId || !batchProcedureName.trim()) {
       setMessage({ text: "Informe o procedimento sanitário.", tone: "danger" });
       return;
     }
@@ -430,7 +448,7 @@ export function VeterinaryScreen() {
 
     createBatchMutation.mutate(
       {
-        haras_id: harasId,
+        haras_id: vetHarasId,
         procedure_type: batchProcedureType,
         procedure_name: batchProcedureName.trim(),
         application_date: batchDate,
@@ -468,7 +486,7 @@ export function VeterinaryScreen() {
   };
 
   const onAddSemenEntry = () => {
-    if (!harasId || !entryStallionId) {
+    if (!vetHarasId || !entryStallionId) {
       setMessage({
         text: "Selecione o garanhão para entrada de paletas.",
         tone: "danger",
@@ -486,7 +504,7 @@ export function VeterinaryScreen() {
 
     addSemenMutation.mutate(
       {
-        haras_id: harasId,
+        haras_id: vetHarasId,
         stallion_id: entryStallionId,
         units_paletas: Math.round(units),
         semen_type: entrySemenType,
@@ -521,7 +539,7 @@ export function VeterinaryScreen() {
   const onSaveTreatment = () => {
     setTreatmentFormError(null);
 
-    if (!harasId || !treatmentAnimalId || !treatmentType.trim()) {
+    if (!vetHarasId || !treatmentAnimalId || !treatmentType.trim()) {
       setTreatmentFormError("Selecione o animal e informe o tipo de tratamento.");
       setMessage({
         text: "Informe animal e tipo de tratamento.",
@@ -537,7 +555,7 @@ export function VeterinaryScreen() {
 
     createTreatmentMutation.mutate(
       {
-        haras_id: harasId,
+        haras_id: vetHarasId,
         animal_id: treatmentAnimalId,
         procedure_date: treatmentDate,
         type: treatmentType.trim(),
@@ -609,7 +627,7 @@ export function VeterinaryScreen() {
 
       <Card>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.info }]}> 
             Sincronização Offline
           </Text>
           <Pressable
@@ -628,16 +646,16 @@ export function VeterinaryScreen() {
           </Pressable>
         </View>
         <View style={styles.syncGrid}>
-          <View style={[styles.syncBox, { borderColor: theme.colors.border }]}>
-            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}>
+          <View style={[styles.syncBox, { borderColor: `${theme.colors.warning}66` }]}> 
+            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}> 
               Pendentes
             </Text>
-            <Text style={[styles.syncValue, { color: theme.colors.text }]}>
+            <Text style={[styles.syncValue, { color: theme.colors.text }]}> 
               {syncSnapshotQuery.data?.pending_count ?? 0}
             </Text>
           </View>
-          <View style={[styles.syncBox, { borderColor: theme.colors.border }]}>
-            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}>
+          <View style={[styles.syncBox, { borderColor: `${theme.colors.info}66` }]}> 
+            <Text style={[styles.syncLabel, { color: theme.colors.textMuted }]}> 
               Última sync
             </Text>
             <Text style={[styles.syncValueSmall, { color: theme.colors.text }]}>
@@ -652,7 +670,7 @@ export function VeterinaryScreen() {
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.primary }]}> 
           Painel rápido
         </Text>
         <View style={styles.kpiGrid}>
@@ -684,58 +702,75 @@ export function VeterinaryScreen() {
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
-          Registrar procedimento clínico
+        <Text style={[styles.cardTitle, { color: theme.colors.info }]}> 
+          Hub Veterinário
         </Text>
+        <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Use os módulos dedicados para lançamentos completos e mantenha este espaço para visão geral e operações rápidas.</Text>
         <View style={styles.actionsGrid}>
           <Pressable
-            onPress={() => setExamModalOpen(true)}
+            onPress={() => router.push("/(app)/(tabs)/reproducao")}
             style={({ pressed }) => [
               styles.actionCard,
-              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+              { borderColor: `${theme.colors.info}66`, opacity: pressed ? 0.82 : 1 },
             ]}
           >
             <Activity size={18} color={theme.colors.info} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
-              Novo Exame
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}> 
+              Reprodução
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => setInseminationModalOpen(true)}
+            onPress={() => router.push("/(app)/(tabs)/agenda")}
             style={({ pressed }) => [
               styles.actionCard,
-              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+              { borderColor: `${theme.colors.primary}66`, opacity: pressed ? 0.82 : 1 },
+            ]}
+          >
+            <CalendarDays size={18} color={theme.colors.info} />
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}> 
+              Agenda
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/(app)/(tabs)/rotina")}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: `${theme.colors.warning}66`, opacity: pressed ? 0.82 : 1 },
+            ]}
+          >
+            <ClipboardList size={18} color={theme.colors.warning} />
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}> 
+              Rotina
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/(app)/(tabs)/plantel")}
+            style={({ pressed }) => [
+              styles.actionCard,
+              { borderColor: `${theme.colors.success}66`, opacity: pressed ? 0.82 : 1 },
             ]}
           >
             <ShieldPlus size={18} color={theme.colors.info} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
-              Nova Inseminação
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}> 
+              Plantel clínico
             </Text>
           </Pressable>
-          <Pressable
-            onPress={() => {
-              setTreatmentFormError(null);
-              setTreatmentModalOpen(true);
-            }}
-            style={({ pressed }) => [
-              styles.actionCard,
-              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
-            ]}
-          >
-            <Syringe size={18} color={theme.colors.warning} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
-              Novo Tratamento
-            </Text>
-          </Pressable>
+        </View>
+      </Card>
+
+      <Card>
+        <Text style={[styles.cardTitle, { color: theme.colors.warning }]}>Operações rápidas no hub</Text>
+        <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Ações de suporte que ainda permanecem no hub veterinário.</Text>
+        <View style={styles.actionsGrid}>
           <Pressable
             onPress={() => setBatchModalOpen(true)}
             style={({ pressed }) => [
               styles.actionCard,
-              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+              { borderColor: `${theme.colors.info}66`, opacity: pressed ? 0.82 : 1 },
             ]}
           >
             <Syringe size={18} color={theme.colors.info} />
-            <Text style={[styles.actionTitle, { color: theme.colors.text }]}>
+            <Text style={[styles.actionTitle, { color: theme.colors.text }]}> 
               Vacinação em lote
             </Text>
           </Pressable>
@@ -743,7 +778,7 @@ export function VeterinaryScreen() {
             onPress={() => setSemenEntryModalOpen(true)}
             style={({ pressed }) => [
               styles.actionCard,
-              { borderColor: theme.colors.border, opacity: pressed ? 0.82 : 1 },
+              { borderColor: `${theme.colors.warning}66`, opacity: pressed ? 0.82 : 1 },
             ]}
           >
             <ShieldPlus size={18} color={theme.colors.warning} />
@@ -755,7 +790,7 @@ export function VeterinaryScreen() {
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.cardTitle, { color: theme.colors.success }]}> 
           Estoque de sêmen por garanhão
         </Text>
         {semenQuery.isLoading ? (

@@ -7,9 +7,9 @@ import { AppScreen } from "@/src/components/ui/AppScreen";
 import { Card } from "@/src/components/ui/Card";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useAgendaQuery, useUpdateAgendaStatusMutation } from "@/src/hooks/useAgenda";
-import { useCreateTaskMutation } from "@/src/hooks/useTasks";
-import { isVeterinaryRole } from "@/src/lib/roles";
+import { useAgendaQuery, useConvertAgendaEventToTaskMutation, useUpdateAgendaStatusMutation } from "@/src/hooks/useAgenda";
+import { resolveVetAccess } from "@/src/lib/vet-access";
+import { getAgendaStatusTone, normalizeAgendaEventType } from "@/src/lib/vet-shared";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type { AgendaEventItem } from "@/src/types/domain";
 import { formatDateBR } from "@/src/utils/format";
@@ -23,33 +23,18 @@ function formatTime(value: string | null) {
   return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-function normalizeType(type: string | null | undefined) {
-  const value = (type || "").toLowerCase();
-  if (value.includes("vet") || value.includes("diagn") || value.includes("coleta") || value.includes("p4")) {
-    return "Veterinário";
-  }
-  if (value.includes("serv")) return "Serviço";
-  return "Evento";
-}
-
-function getStatusTone(status: string | null | undefined) {
-  const normalized = (status || "").toLowerCase();
-  if (normalized.includes("concl")) return "success" as const;
-  if (normalized.includes("cancel")) return "danger" as const;
-  if (normalized.includes("pend")) return "warning" as const;
-  return "neutral" as const;
-}
-
 export function VetAgendaScreen() {
   const router = useRouter();
   const { role, harasId, user } = useAuth();
   const { theme } = useAppTheme();
+  const vetAccess = resolveVetAccess(role, harasId);
+  const vetHarasId = vetAccess.scopedHarasId;
   const [selectedEvent, setSelectedEvent] = useState<AgendaEventItem | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>("week");
-  const updateStatusMutation = useUpdateAgendaStatusMutation(harasId);
-  const createTaskMutation = useCreateTaskMutation();
+  const updateStatusMutation = useUpdateAgendaStatusMutation(vetHarasId);
+  const convertToTaskMutation = useConvertAgendaEventToTaskMutation(vetHarasId);
 
-  if (!isVeterinaryRole(role)) {
+  if (!vetAccess.canAccessVet) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -59,7 +44,7 @@ export function VetAgendaScreen() {
     );
   }
 
-  if (!harasId) {
+  if (!vetAccess.hasHaras) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -72,7 +57,7 @@ export function VetAgendaScreen() {
     );
   }
 
-  const agendaQuery = useAgendaQuery(harasId);
+  const agendaQuery = useAgendaQuery(vetHarasId);
 
   const onUpdateStatus = (status: "Pendente" | "Em andamento" | "Concluído" | "Cancelado") => {
     if (!selectedEvent) return;
@@ -87,19 +72,13 @@ export function VetAgendaScreen() {
   };
 
   const onConvertToTask = () => {
-    if (!selectedEvent || !harasId) return;
-    createTaskMutation.mutate(
+    if (!selectedEvent || !vetHarasId) return;
+    convertToTaskMutation.mutate(
       {
-        haras_id: harasId,
-        title: selectedEvent.titulo,
-        due_date: selectedEvent.data_inicio.slice(0, 10),
-        status: "pendente",
-        priority: "media",
-        observations: selectedEvent.descricao,
-        animal_id: selectedEvent.animal_id,
+        event_id: selectedEvent.id,
+        haras_id: vetHarasId,
         responsible_id: user?.id ?? null,
         created_by: user?.id ?? null,
-        task_type: "evento_agenda",
       },
       {
         onSuccess: () => setSelectedEvent(null),
@@ -125,16 +104,44 @@ export function VetAgendaScreen() {
       .sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
   }, [agendaQuery.data, dateFilter]);
 
+  const summary = useMemo(() => {
+    const base = filtered;
+    return {
+      pending: base.filter((item) => getAgendaStatusTone(item.status) === "warning").length,
+      inProgress: base.filter((item) => String(item.status || "").toLowerCase().includes("andamento")).length,
+      done: base.filter((item) => getAgendaStatusTone(item.status) === "success").length,
+    };
+  }, [filtered]);
+
   return (
     <AppScreen scroll>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.colors.text }]}>Agenda</Text>
       </View>
 
+      <Card style={{ backgroundColor: `${theme.colors.info}12`, borderColor: `${theme.colors.info}55` }}>
+        <Text style={[styles.line, { color: theme.colors.textMuted }]}>Agenda clínica com destaque por status para facilitar triagem no dia a dia.</Text>
+      </Card>
+
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryBox, { borderColor: `${theme.colors.warning}55`, backgroundColor: `${theme.colors.warning}14` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Pendentes</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{summary.pending}</Text>
+        </View>
+        <View style={[styles.summaryBox, { borderColor: `${theme.colors.info}55`, backgroundColor: `${theme.colors.info}14` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Em andamento</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{summary.inProgress}</Text>
+        </View>
+        <View style={[styles.summaryBox, { borderColor: `${theme.colors.success}55`, backgroundColor: `${theme.colors.success}14` }]}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Concluídos</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{summary.done}</Text>
+        </View>
+      </View>
+
       <Card>
         <View style={styles.row}>
-          <CalendarDays size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Janela da agenda</Text>
+          <CalendarDays size={18} color={theme.colors.info} />
+          <Text style={[styles.cardTitle, { color: theme.colors.info }]}>Janela da agenda</Text>
         </View>
         <View style={styles.filterRow}>
           {([
@@ -165,12 +172,12 @@ export function VetAgendaScreen() {
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Eventos</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.success }]}>Eventos</Text>
         {agendaQuery.isLoading ? (
           <Text style={[styles.line, { color: theme.colors.textMuted }]}>Carregando eventos...</Text>
         ) : filtered.length ? (
           filtered.map((item) => {
-            const tone = getStatusTone(item.status);
+            const tone = getAgendaStatusTone(item.status);
             const chipBorder =
               tone === "success"
                 ? theme.colors.success
@@ -189,7 +196,7 @@ export function VetAgendaScreen() {
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.titulo}</Text>
                   <Text style={[styles.itemType, { color: theme.colors.textMuted }]}>
-                    {normalizeType(item.tipo)} {item.animal_name ? `• ${item.animal_name}` : ""}
+                    {normalizeAgendaEventType(item.tipo)} {item.animal_name ? `• ${item.animal_name}` : ""}
                   </Text>
                   <View style={styles.metaRow}>
                     <Clock3 size={12} color={theme.colors.textMuted} />
@@ -219,7 +226,7 @@ export function VetAgendaScreen() {
           <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}> 
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Detalhes do evento</Text>
             <Text style={[styles.modalMain, { color: theme.colors.text }]}>{selectedEvent?.titulo || "-"}</Text>
-            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Tipo: {selectedEvent ? normalizeType(selectedEvent.tipo) : "-"}</Text>
+            <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Tipo: {selectedEvent ? normalizeAgendaEventType(selectedEvent.tipo) : "-"}</Text>
             <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Data: {selectedEvent ? `${formatDateBR(selectedEvent.data_inicio)} às ${formatTime(selectedEvent.data_inicio)}` : "-"}</Text>
             <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Animal: {selectedEvent?.animal_name || "Não informado"}</Text>
             <Text style={[styles.modalLine, { color: theme.colors.textMuted }]}>Local: {selectedEvent?.local || "Não informado"}</Text>
@@ -238,7 +245,7 @@ export function VetAgendaScreen() {
                   router.push("/(app)/(tabs)/reproducao");
                 }}
               />
-              <AppButton label="Delegar como tarefa" variant="ghost" onPress={onConvertToTask} loading={createTaskMutation.isPending} />
+              <AppButton label="Delegar como tarefa" variant="ghost" onPress={onConvertToTask} loading={convertToTaskMutation.isPending} />
             </View>
           </View>
         </View>
@@ -285,6 +292,16 @@ const styles = StyleSheet.create({
   },
   statusChipLabel: { fontSize: 11, fontWeight: "700" },
   line: { fontSize: 13 },
+  summaryRow: { flexDirection: "row", gap: 8 },
+  summaryBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  summaryLabel: { fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, fontWeight: "700" },
+  summaryValue: { fontSize: 19, fontWeight: "700" },
   modalRoot: { flex: 1, justifyContent: "center", padding: 16 },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.58)" },
   modalCard: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 10 },

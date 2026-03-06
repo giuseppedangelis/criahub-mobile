@@ -24,6 +24,14 @@ function normalizeEventType(value: string) {
   return map[value] || value;
 }
 
+function getStatusTone(value: string | null | undefined) {
+  const normalized = (value || "").toLowerCase();
+  if (normalized.includes("concl") || normalized.includes("confirm") || normalized.includes("nasc")) return "success" as const;
+  if (normalized.includes("abort") || normalized.includes("cancel") || normalized.includes("rejeit")) return "danger" as const;
+  if (normalized.includes("andamento")) return "info" as const;
+  return "warning" as const;
+}
+
 export function ReproductionScreen() {
   const { role, harasId } = useAuth();
   const { theme } = useAppTheme();
@@ -89,82 +97,90 @@ export function ReproductionScreen() {
       </View>
 
       <View style={styles.summaryGrid}>
-        <Card style={styles.summaryCard}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Eventos reprodutivos</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{events.length}</Text>
-        </Card>
-        <Card style={styles.summaryCard}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Gestações</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{gestations.length}</Text>
-        </Card>
-        <Card style={styles.summaryCard}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Ativas</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{gestantesAtivas.length}</Text>
-        </Card>
-        <Card style={styles.summaryCard}>
-          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Parto previsto</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{withExpectedBirth.length}</Text>
-        </Card>
+        {[
+          { label: "Eventos reprodutivos", value: events.length, accent: theme.colors.info },
+          { label: "Gestações", value: gestations.length, accent: theme.colors.primary },
+          { label: "Ativas", value: gestantesAtivas.length, accent: theme.colors.success },
+          { label: "Parto previsto", value: withExpectedBirth.length, accent: theme.colors.warning },
+        ].map((item) => (
+          <Card key={item.label} style={[styles.summaryCard, { backgroundColor: `${item.accent}14`, borderColor: `${item.accent}55` }]}>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>{item.label}</Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{item.value}</Text>
+          </Card>
+        ))}
       </View>
 
       <Card>
         <View style={styles.cardHeader}>
-          <Heart size={18} color={theme.colors.text} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Últimos eventos reprodutivos</Text>
+          <Heart size={18} color={theme.colors.info} />
+          <Text style={[styles.cardTitle, { color: theme.colors.info }]}>Últimos eventos reprodutivos</Text>
         </View>
         {events.length > 0 ? (
-          events.slice(0, 10).map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => setSelectedEvent(item)}
-              style={({ pressed }) => [
-                styles.listRow,
-                { borderColor: theme.colors.border, opacity: pressed ? 0.78 : 1 },
-              ]}
-            >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
-                  {normalizeEventType(item.event_type)}
-                </Text>
-                <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}> 
-                  Animal: {item.animal_name || item.mare_name || item.stallion_name || "Não informado"}
-                </Text>
-                <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>Data: {formatDateBR(item.event_date)}</Text>
-              </View>
-              <Text style={[styles.rowStatus, { color: theme.colors.textMuted }]}>{item.status || "-"}</Text>
-            </Pressable>
-          ))
+          events.slice(0, 10).map((item) => {
+            const tone = getStatusTone(item.status);
+            const accent = tone === "success" ? theme.colors.success : tone === "danger" ? theme.colors.danger : tone === "info" ? theme.colors.info : theme.colors.warning;
+
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setSelectedEvent(item)}
+                style={({ pressed }) => [
+                  styles.listRow,
+                  { borderColor: theme.colors.border, opacity: pressed ? 0.78 : 1 },
+                ]}
+              >
+                <View style={styles.rowMain}>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
+                    {normalizeEventType(item.event_type)}
+                  </Text>
+                  <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}> 
+                    Animal: {item.animal_name || item.mare_name || item.stallion_name || "Não informado"}
+                  </Text>
+                  <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>Data: {formatDateBR(item.event_date)}</Text>
+                </View>
+                <View style={[styles.statusBadge, { borderColor: accent }]}> 
+                  <Text style={[styles.statusBadgeLabel, { color: accent }]}>{item.status || "-"}</Text>
+                </View>
+              </Pressable>
+            );
+          })
         ) : (
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Nenhum evento encontrado.</Text>
         )}
       </Card>
 
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Gestações</Text>
+        <Text style={[styles.cardTitle, { color: theme.colors.success }]}>Gestações</Text>
         {gestations.length > 0 ? (
-          gestations.slice(0, 10).map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => setSelectedGestation(item)}
-              style={({ pressed }) => [
-                styles.listRow,
-                { borderColor: theme.colors.border, opacity: pressed ? 0.78 : 1 },
-              ]}
-            >
-              <View style={styles.rowMain}>
-                <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
-                  Égua: {item.egua_name || "Não informada"}
-                </Text>
-                <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}> 
-                  Garanhão: {item.garanhao_name || "Não informado"}
-                </Text>
-                <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}> 
-                  Parto previsto: {formatDateBR(item.data_prevista_parto)}
-                </Text>
-              </View>
-              <Text style={[styles.rowStatus, { color: theme.colors.textMuted }]}>{item.status || "-"}</Text>
-            </Pressable>
-          ))
+          gestations.slice(0, 10).map((item) => {
+            const tone = getStatusTone(item.status);
+            const accent = tone === "success" ? theme.colors.success : tone === "danger" ? theme.colors.danger : tone === "info" ? theme.colors.info : theme.colors.warning;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => setSelectedGestation(item)}
+                style={({ pressed }) => [
+                  styles.listRow,
+                  { borderColor: theme.colors.border, opacity: pressed ? 0.78 : 1 },
+                ]}
+              >
+                <View style={styles.rowMain}>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
+                    Égua: {item.egua_name || "Não informada"}
+                  </Text>
+                  <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}> 
+                    Garanhão: {item.garanhao_name || "Não informado"}
+                  </Text>
+                  <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}> 
+                    Parto previsto: {formatDateBR(item.data_prevista_parto)}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { borderColor: accent }]}> 
+                  <Text style={[styles.statusBadgeLabel, { color: accent }]}>{item.status || "-"}</Text>
+                </View>
+              </Pressable>
+            );
+          })
         ) : (
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Nenhuma gestação encontrada.</Text>
         )}
@@ -356,6 +372,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  statusBadge: {
+    borderWidth: 1,
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusBadgeLabel: { fontSize: 11, fontWeight: "700" },
   emptyText: {
     fontSize: 13,
   },
