@@ -3,6 +3,7 @@ import { useLocalSearchParams } from "expo-router";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { AnimalSearchSelect } from "@/src/components/ui/AnimalSearchSelect";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { Card } from "@/src/components/ui/Card";
@@ -10,7 +11,7 @@ import { DateField } from "@/src/components/ui/DateField";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useAnimalsQuery } from "@/src/hooks/useAnimals";
+import { useAnimalQuery } from "@/src/hooks/useAnimals";
 import {
   useCreateGestationMutation,
   useCreateReproductiveEventMutation,
@@ -81,64 +82,6 @@ function gestationAccent(status: string | null | undefined) {
   return "warning" as const;
 }
 
-function AnimalPicker({
-  title,
-  animals,
-  selectedId,
-  onSelect,
-}: {
-  title: string;
-  animals: { id: string; name: string }[];
-  selectedId: string;
-  onSelect: (id: string) => void;
-}) {
-  const { theme } = useAppTheme();
-  const [search, setSearch] = useState("");
-
-  const filtered = useMemo(() => {
-    const text = search.trim().toLowerCase();
-    if (!text) return animals;
-    return animals.filter((item) => item.name.toLowerCase().includes(text));
-  }, [animals, search]);
-
-  return (
-    <View style={styles.selectorBlock}>
-      <Text style={[styles.inputLabel, { color: theme.colors.text }]}>{title}</Text>
-      <TextField
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Buscar por nome"
-      />
-      <View style={[styles.selectorList, { borderColor: theme.colors.border }]}>
-        <ScrollView nestedScrollEnabled style={styles.selectorScroll}>
-          {filtered.slice(0, 35).map((item) => {
-            const active = selectedId === item.id;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => onSelect(item.id)}
-                style={({ pressed }) => [
-                  styles.selectorItem,
-                  {
-                    borderColor: active ? theme.colors.primary : theme.colors.border,
-                    backgroundColor: active ? theme.colors.surfaceAlt : "transparent",
-                    opacity: pressed ? 0.86 : 1,
-                  },
-                ]}
-              >
-                <Text style={{ color: theme.colors.text }}>{item.name}</Text>
-              </Pressable>
-            );
-          })}
-          {filtered.length === 0 ? (
-            <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Nenhum animal encontrado.</Text>
-          ) : null}
-        </ScrollView>
-      </View>
-    </View>
-  );
-}
-
 export function VetReproductionScreen() {
   const params = useLocalSearchParams<{ action?: string; animalId?: string }>();
   const { role, harasId, profile } = useAuth();
@@ -152,17 +95,6 @@ export function VetReproductionScreen() {
   const createEventMutation = useCreateReproductiveEventMutation();
   const createGestationMutation = useCreateGestationMutation();
   const updateGestationStatusMutation = useUpdateGestationStatusMutation();
-  const maresQuery = useAnimalsQuery(
-    { haras_id: vetHarasId ?? undefined, sex: "Fêmea", status: "ativo" },
-    { page: 1, limit: 200 },
-    vetAccess.canLoadVetData,
-  );
-  const stallionsQuery = useAnimalsQuery(
-    { haras_id: vetHarasId ?? undefined, sex: "Macho", status: "ativo" },
-    { page: 1, limit: 200 },
-    vetAccess.canLoadVetData,
-  );
-
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [gestationModalOpen, setGestationModalOpen] = useState(false);
   const [statusModal, setStatusModal] = useState<{
@@ -179,15 +111,19 @@ export function VetReproductionScreen() {
   >("all");
   const [eventDate, setEventDate] = useState(todayIsoDate());
   const [eventMareId, setEventMareId] = useState("");
+  const [eventMareSearch, setEventMareSearch] = useState("");
   const [eventStallionId, setEventStallionId] = useState("");
+  const [eventStallionSearch, setEventStallionSearch] = useState("");
   const [eventStatus, setEventStatus] = useState("Pendente");
   const [eventNotes, setEventNotes] = useState("");
 
   const [gestationMareId, setGestationMareId] = useState("");
+  const [gestationMareSearch, setGestationMareSearch] = useState("");
   const [gestationFilter, setGestationFilter] = useState<
     "all" | "em_andamento" | "confirmada" | "nascimento" | "aborto"
   >("all");
   const [gestationStallionId, setGestationStallionId] = useState("");
+  const [gestationStallionSearch, setGestationStallionSearch] = useState("");
   const [gestationStartDate, setGestationStartDate] = useState(todayIsoDate());
   const [gestationConfirmDate, setGestationConfirmDate] =
     useState(todayIsoDate());
@@ -195,46 +131,31 @@ export function VetReproductionScreen() {
   const [gestationStatus, setGestationStatus] = useState("em_andamento");
   const [gestationNotes, setGestationNotes] = useState("");
 
-  const mares = useMemo(
-    () =>
-      (maresQuery.data?.data ?? []).map((item) => ({
-        id: item.id,
-        name: item.name,
-      })),
-    [maresQuery.data?.data],
-  );
-  const stallions = useMemo(
-    () =>
-      (stallionsQuery.data?.data ?? []).map((item) => ({
-        id: item.id,
-        name: item.name,
-      })),
-    [stallionsQuery.data?.data],
-  );
-  const selectedEventMareName =
-    mares.find((item) => item.id === eventMareId)?.name || "Nenhuma égua selecionada";
-  const selectedEventStallionName =
-    stallions.find((item) => item.id === eventStallionId)?.name ||
-    "Sem garanhão vinculado";
-  const selectedGestationMareName =
-    mares.find((item) => item.id === gestationMareId)?.name ||
-    "Nenhuma égua selecionada";
-  const selectedGestationStallionName =
-    stallions.find((item) => item.id === gestationStallionId)?.name ||
-    "Sem garanhão vinculado";
+  const selectedEventMareQuery = useAnimalQuery(eventMareId, vetAccess.canLoadVetData && Boolean(eventMareId));
+  const selectedEventStallionQuery = useAnimalQuery(eventStallionId, vetAccess.canLoadVetData && Boolean(eventStallionId));
+  const selectedGestationMareQuery = useAnimalQuery(gestationMareId, vetAccess.canLoadVetData && Boolean(gestationMareId));
+  const selectedGestationStallionQuery = useAnimalQuery(gestationStallionId, vetAccess.canLoadVetData && Boolean(gestationStallionId));
+  const selectedEventMareName = selectedEventMareQuery.data?.name || "Nenhuma égua selecionada";
+  const selectedEventStallionName = selectedEventStallionQuery.data?.name || "Sem garanhão vinculado";
+  const selectedGestationMareName = selectedGestationMareQuery.data?.name || "Nenhuma égua selecionada";
+  const selectedGestationStallionName = selectedGestationStallionQuery.data?.name || "Sem garanhão vinculado";
 
   const resetEventForm = () => {
     setEventType("inseminacao");
     setEventDate(todayIsoDate());
     setEventMareId("");
+    setEventMareSearch("");
     setEventStallionId("");
+    setEventStallionSearch("");
     setEventStatus("Pendente");
     setEventNotes("");
   };
 
   const resetGestationForm = () => {
     setGestationMareId("");
+    setGestationMareSearch("");
     setGestationStallionId("");
+    setGestationStallionSearch("");
     setGestationStartDate(todayIsoDate());
     setGestationConfirmDate(todayIsoDate());
     setGestationExpectedBirth("");
@@ -578,24 +499,53 @@ export function VetReproductionScreen() {
               ))}
             </View>
             <DateField label="Data" value={eventDate} onChange={setEventDate} />
-            <AnimalPicker
+            <AnimalSearchSelect
               title="Égua"
-              animals={mares}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Fêmea", status: "ativo" }}
               selectedId={eventMareId}
-              onSelect={setEventMareId}
+              searchValue={eventMareSearch}
+              onSearchChange={setEventMareSearch}
+              onSelect={(animal) => {
+                setEventMareId(animal.id);
+                setEventMareSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setEventMareId("");
+                setEventMareSearch("");
+              }}
+              searchPlaceholder="Buscar por nome"
+              selectedLabelPrefix="Égua"
             />
             <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Égua selecionada: {selectedEventMareName}</Text>
-            <AnimalPicker
+            <AnimalSearchSelect
               title="Garanhão (opcional)"
-              animals={stallions}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Macho", status: "ativo" }}
               selectedId={eventStallionId}
-              onSelect={setEventStallionId}
+              searchValue={eventStallionSearch}
+              onSearchChange={setEventStallionSearch}
+              onSelect={(animal) => {
+                setEventStallionId(animal.id);
+                setEventStallionSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setEventStallionId("");
+                setEventStallionSearch("");
+              }}
+              searchPlaceholder="Buscar por nome"
+              selectedLabelPrefix="Garanhão"
             />
             <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Garanhão selecionado: {selectedEventStallionName}</Text>
             <AppButton
               label="Limpar garanhão"
               variant="ghost"
-              onPress={() => setEventStallionId("")}
+              onPress={() => {
+                setEventStallionId("");
+                setEventStallionSearch("");
+              }}
             />
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Status</Text>
             <View style={styles.optionRow}>
@@ -705,24 +655,53 @@ export function VetReproductionScreen() {
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               Nova gestação
             </Text>
-            <AnimalPicker
+            <AnimalSearchSelect
               title="Égua"
-              animals={mares}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Fêmea", status: "ativo" }}
               selectedId={gestationMareId}
-              onSelect={setGestationMareId}
+              searchValue={gestationMareSearch}
+              onSearchChange={setGestationMareSearch}
+              onSelect={(animal) => {
+                setGestationMareId(animal.id);
+                setGestationMareSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setGestationMareId("");
+                setGestationMareSearch("");
+              }}
+              searchPlaceholder="Buscar por nome"
+              selectedLabelPrefix="Égua"
             />
             <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Égua selecionada: {selectedGestationMareName}</Text>
-            <AnimalPicker
+            <AnimalSearchSelect
               title="Garanhão (opcional)"
-              animals={stallions}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Macho", status: "ativo" }}
               selectedId={gestationStallionId}
-              onSelect={setGestationStallionId}
+              searchValue={gestationStallionSearch}
+              onSearchChange={setGestationStallionSearch}
+              onSelect={(animal) => {
+                setGestationStallionId(animal.id);
+                setGestationStallionSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setGestationStallionId("");
+                setGestationStallionSearch("");
+              }}
+              searchPlaceholder="Buscar por nome"
+              selectedLabelPrefix="Garanhão"
             />
             <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Garanhão selecionado: {selectedGestationStallionName}</Text>
             <AppButton
               label="Limpar garanhão"
               variant="ghost"
-              onPress={() => setGestationStallionId("")}
+              onPress={() => {
+                setGestationStallionId("");
+                setGestationStallionSearch("");
+              }}
             />
             <DateField
               label="Data inicial"
@@ -980,23 +959,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
-  },
-  selectorBlock: { gap: 8 },
-  selectorList: {
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 90,
-    maxHeight: 140,
-    padding: 8,
-  },
-  selectorScroll: { flexGrow: 0 },
-  selectorItem: {
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 34,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    marginBottom: 6,
   },
   modalRoot: { flex: 1, justifyContent: "center", padding: 16 },
   modalBackdrop: {

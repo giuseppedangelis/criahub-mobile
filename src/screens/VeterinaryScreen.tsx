@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   Activity,
@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import { AnimalSearchSelect } from "@/src/components/ui/AnimalSearchSelect";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { Card } from "@/src/components/ui/Card";
@@ -25,7 +26,6 @@ import { EmptyState } from "@/src/components/ui/EmptyState";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useHealthSummary } from "@/src/hooks/useAnimalHealth";
-import { useAnimalsQuery } from "@/src/hooks/useAnimals";
 import {
   useAddSemenEntryMutation,
   useCreateBreedingEventMutation,
@@ -49,77 +49,6 @@ function parseOptionalNumber(value: string) {
   const normalized = value.replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function AnimalSelector({
-  title,
-  animals,
-  selectedId,
-  isSelected,
-  onSelect,
-}: {
-  title: string;
-  animals: { id: string; name: string }[];
-  selectedId: string;
-  isSelected?: (id: string) => boolean;
-  onSelect: (id: string) => void;
-}) {
-  const { theme } = useAppTheme();
-  const [search, setSearch] = useState("");
-
-  const filtered = useMemo(() => {
-    const text = search.trim().toLowerCase();
-    if (!text) return animals;
-    return animals.filter((item) => item.name.toLowerCase().includes(text));
-  }, [animals, search]);
-
-  return (
-    <View style={styles.selectorBlock}>
-      <Text style={[styles.selectorTitle, { color: theme.colors.text }]}>
-        {title}
-      </Text>
-      <TextField
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Buscar animal"
-      />
-      <View style={[styles.selectorList, { borderColor: theme.colors.border }]}>
-        <ScrollView nestedScrollEnabled style={styles.selectorScroll}>
-          {filtered.slice(0, 40).map((item) => {
-            const active =
-              selectedId === item.id || Boolean(isSelected?.(item.id));
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => onSelect(item.id)}
-                style={({ pressed }) => [
-                  styles.selectorItem,
-                  {
-                    borderColor: active
-                      ? theme.colors.primary
-                      : theme.colors.border,
-                    backgroundColor: active
-                      ? theme.colors.surfaceAlt
-                      : "transparent",
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.selectorItemLabel,
-                    { color: theme.colors.text },
-                  ]}
-                >
-                  {item.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-    </View>
-  );
 }
 
 function QuickKpi({ label, value }: { label: string; value: string }) {
@@ -148,21 +77,6 @@ export function VeterinaryScreen() {
   const healthSummaryQuery = useHealthSummary(vetHarasId);
   const semenQuery = useSemenInventoryQuery(vetHarasId);
   const syncSnapshotQuery = useVeterinarySyncSnapshotQuery(vetHarasId);
-  const femalesQuery = useAnimalsQuery(
-    { haras_id: vetHarasId ?? undefined, sex: "Fêmea", status: "ativo" },
-    { page: 1, limit: 160 },
-    vetAccess.canLoadVetData,
-  );
-  const stallionsQuery = useAnimalsQuery(
-    { haras_id: vetHarasId ?? undefined, sex: "Macho", status: "ativo" },
-    { page: 1, limit: 120 },
-    vetAccess.canLoadVetData,
-  );
-  const allAnimalsQuery = useAnimalsQuery(
-    { haras_id: vetHarasId ?? undefined, status: "ativo" },
-    { page: 1, limit: 260 },
-    vetAccess.canLoadVetData,
-  );
 
   const createExamMutation = useCreateReproductiveExamMutation(vetHarasId);
   const createBreedingMutation = useCreateBreedingEventMutation(vetHarasId);
@@ -178,6 +92,7 @@ export function VeterinaryScreen() {
 
   const [examModalOpen, setExamModalOpen] = useState(false);
   const [examAnimalId, setExamAnimalId] = useState("");
+  const [examAnimalSearch, setExamAnimalSearch] = useState("");
   const [follicleRight, setFollicleRight] = useState("");
   const [follicleLeft, setFollicleLeft] = useState("");
   const [edema, setEdema] = useState(2);
@@ -189,7 +104,9 @@ export function VeterinaryScreen() {
 
   const [inseminationModalOpen, setInseminationModalOpen] = useState(false);
   const [mareId, setMareId] = useState("");
+  const [mareSearch, setMareSearch] = useState("");
   const [stallionId, setStallionId] = useState("");
+  const [stallionSearch, setStallionSearch] = useState("");
   const [method, setMethod] = useState<"IA" | "Monta" | "Transfer">("IA");
   const [semenType, setSemenType] = useState<
     "Fresco" | "Resfriado" | "Congelado"
@@ -213,12 +130,14 @@ export function VeterinaryScreen() {
   const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>(
     {},
   );
+  const [batchAnimalSearch, setBatchAnimalSearch] = useState("");
   const [batchCategoryFilter, setBatchCategoryFilter] = useState<
     "all" | "egua" | "garanhao" | "potro" | "potra" | "castrado"
   >("all");
 
   const [semenEntryModalOpen, setSemenEntryModalOpen] = useState(false);
   const [entryStallionId, setEntryStallionId] = useState("");
+  const [entryStallionSearch, setEntryStallionSearch] = useState("");
   const [entryUnits, setEntryUnits] = useState("1");
   const [entrySemenType, setEntrySemenType] = useState<
     "Fresco" | "Resfriado" | "Congelado"
@@ -228,6 +147,7 @@ export function VeterinaryScreen() {
 
   const [treatmentModalOpen, setTreatmentModalOpen] = useState(false);
   const [treatmentAnimalId, setTreatmentAnimalId] = useState("");
+  const [treatmentAnimalSearch, setTreatmentAnimalSearch] = useState("");
   const [treatmentType, setTreatmentType] = useState("");
   const [treatmentDate, setTreatmentDate] = useState(todayIsoDate());
   const [treatmentNextDate, setTreatmentNextDate] = useState("");
@@ -302,27 +222,6 @@ export function VeterinaryScreen() {
     );
   }
 
-  const femalesSource = (femalesQuery.data?.data ?? []).map((item) => ({
-    id: item.id,
-    name: item.name,
-  }));
-  const stallions = (stallionsQuery.data?.data ?? []).map((item) => ({
-    id: item.id,
-    name: item.name,
-  }));
-  const allAnimalsSource = (allAnimalsQuery.data?.data ?? []).length
-    ? allAnimalsQuery.data?.data ?? []
-    : [...(femalesQuery.data?.data ?? []), ...(stallionsQuery.data?.data ?? [])];
-  const females = femalesSource.length
-    ? femalesSource
-    : allAnimalsSource.map((item) => ({ id: item.id, name: item.name }));
-  const allAnimals = allAnimalsSource
-    .filter((item) =>
-      batchCategoryFilter === "all"
-        ? true
-        : item.category === batchCategoryFilter,
-    )
-    .map((item) => ({ id: item.id, name: item.name }));
   const selectedBatchIds = Object.keys(batchSelected).filter(
     (item) => batchSelected[item],
   );
@@ -367,6 +266,8 @@ export function VeterinaryScreen() {
             tone: result.synced ? "success" : "warning",
           });
           setExamModalOpen(false);
+          setExamAnimalId("");
+          setExamAnimalSearch("");
           setFollicleRight("");
           setFollicleLeft("");
           setExamNotes("");
@@ -421,6 +322,10 @@ export function VeterinaryScreen() {
             tone: result.synced ? "success" : "warning",
           });
           setInseminationModalOpen(false);
+          setMareId("");
+          setMareSearch("");
+          setStallionId("");
+          setStallionSearch("");
           setInseminationNotes("");
         },
         onError: (error) => {
@@ -471,6 +376,7 @@ export function VeterinaryScreen() {
           setBatchLot("");
           setBatchExpiration("");
           setBatchSelected({});
+          setBatchAnimalSearch("");
         },
         onError: (error) => {
           setMessage({
@@ -519,6 +425,8 @@ export function VeterinaryScreen() {
             tone: result.synced ? "success" : "warning",
           });
           setSemenEntryModalOpen(false);
+          setEntryStallionId("");
+          setEntryStallionSearch("");
           setEntryUnits("1");
           setEntryReason("");
           setEntryNotes("");
@@ -575,6 +483,8 @@ export function VeterinaryScreen() {
             tone: result.synced ? "success" : "warning",
           });
           setTreatmentModalOpen(false);
+          setTreatmentAnimalId("");
+          setTreatmentAnimalSearch("");
           setTreatmentType("");
           setTreatmentDescription("");
           setTreatmentMedication("");
@@ -847,11 +757,24 @@ export function VeterinaryScreen() {
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               Registro de Exame Reprodutivo
             </Text>
-            <AnimalSelector
+            <AnimalSearchSelect
               title="Matriz"
-              animals={females}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Fêmea", status: "ativo" }}
               selectedId={examAnimalId}
-              onSelect={setExamAnimalId}
+              searchValue={examAnimalSearch}
+              onSearchChange={setExamAnimalSearch}
+              onSelect={(animal) => {
+                setExamAnimalId(animal.id);
+                setExamAnimalSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setExamAnimalId("");
+                setExamAnimalSearch("");
+              }}
+              searchPlaceholder="Buscar animal"
+              selectedLabelPrefix="Matriz"
             />
             <TextField
               label="Folículo OD (mm)"
@@ -1007,17 +930,43 @@ export function VeterinaryScreen() {
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               Registro de Inseminação
             </Text>
-            <AnimalSelector
+            <AnimalSearchSelect
               title="Matriz"
-              animals={females}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Fêmea", status: "ativo" }}
               selectedId={mareId}
-              onSelect={setMareId}
+              searchValue={mareSearch}
+              onSearchChange={setMareSearch}
+              onSelect={(animal) => {
+                setMareId(animal.id);
+                setMareSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setMareId("");
+                setMareSearch("");
+              }}
+              searchPlaceholder="Buscar animal"
+              selectedLabelPrefix="Matriz"
             />
-            <AnimalSelector
+            <AnimalSearchSelect
               title="Garanhão"
-              animals={stallions}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Macho", status: "ativo" }}
               selectedId={stallionId}
-              onSelect={setStallionId}
+              searchValue={stallionSearch}
+              onSearchChange={setStallionSearch}
+              onSelect={(animal) => {
+                setStallionId(animal.id);
+                setStallionSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setStallionId("");
+                setStallionSearch("");
+              }}
+              searchPlaceholder="Buscar animal"
+              selectedLabelPrefix="Garanhão"
             />
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
               Método
@@ -1246,14 +1195,22 @@ export function VeterinaryScreen() {
                 </Pressable>
               ))}
             </View>
-            <AnimalSelector
+            <AnimalSearchSelect
               title={`Selecionar animais (${selectedBatchIds.length})`}
-              animals={allAnimals}
-              selectedId=""
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{
+                status: "ativo",
+                category: batchCategoryFilter === "all" ? undefined : batchCategoryFilter,
+              }}
+              searchValue={batchAnimalSearch}
+              onSearchChange={setBatchAnimalSearch}
               isSelected={(id) => Boolean(batchSelected[id])}
-              onSelect={(id) =>
-                setBatchSelected((prev) => ({ ...prev, [id]: !prev[id] }))
+              onSelect={(animal) =>
+                setBatchSelected((prev) => ({ ...prev, [animal.id]: !prev[animal.id] }))
               }
+              searchPlaceholder="Buscar animal"
+              selectedLabelPrefix="Animal"
             />
             <View style={styles.modalActions}>
               <AppButton
@@ -1298,11 +1255,24 @@ export function VeterinaryScreen() {
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               Entrada de paletas
             </Text>
-            <AnimalSelector
+            <AnimalSearchSelect
               title="Garanhão"
-              animals={stallions}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ sex: "Macho", status: "ativo" }}
               selectedId={entryStallionId}
-              onSelect={setEntryStallionId}
+              searchValue={entryStallionSearch}
+              onSearchChange={setEntryStallionSearch}
+              onSelect={(animal) => {
+                setEntryStallionId(animal.id);
+                setEntryStallionSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setEntryStallionId("");
+                setEntryStallionSearch("");
+              }}
+              searchPlaceholder="Buscar animal"
+              selectedLabelPrefix="Garanhão"
             />
             <TextField
               label="Quantidade de paletas"
@@ -1399,14 +1369,24 @@ export function VeterinaryScreen() {
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
               Novo Tratamento
             </Text>
-            <AnimalSelector
+            <AnimalSearchSelect
               title="Animal"
-              animals={allAnimalsSource.map((item) => ({
-                id: item.id,
-                name: item.name,
-              }))}
+              harasId={vetHarasId}
+              enabled={vetAccess.canLoadVetData}
+              filters={{ status: "ativo" }}
               selectedId={treatmentAnimalId}
-              onSelect={setTreatmentAnimalId}
+              searchValue={treatmentAnimalSearch}
+              onSearchChange={setTreatmentAnimalSearch}
+              onSelect={(animal) => {
+                setTreatmentAnimalId(animal.id);
+                setTreatmentAnimalSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setTreatmentAnimalId("");
+                setTreatmentAnimalSearch("");
+              }}
+              searchPlaceholder="Buscar animal"
+              selectedLabelPrefix="Animal"
             />
             <TextField
               label="Tipo"
@@ -1538,24 +1518,6 @@ const styles = StyleSheet.create({
   },
   modalContent: { padding: 16, gap: 10, paddingBottom: 28 },
   modalTitle: { fontSize: 17, fontWeight: "700" },
-  selectorBlock: { gap: 8 },
-  selectorTitle: { fontSize: 14, fontWeight: "600" },
-  selectorList: {
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 140,
-    maxHeight: 220,
-    padding: 8,
-  },
-  selectorScroll: { flex: 1 },
-  selectorItem: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    marginBottom: 8,
-  },
-  selectorItemLabel: { fontSize: 13, fontWeight: "600" },
   inputLabel: { fontSize: 13, fontWeight: "600" },
   optionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionChip: {

@@ -6,12 +6,13 @@ import * as Location from "expo-location";
 import NetInfo from "@react-native-community/netinfo";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlertTriangle, Baby, BellRing, CalendarDays, CheckCircle2, ChevronRight, Cloud, Search, Send } from "lucide-react-native";
+import { AnimalSearchSelect } from "@/src/components/ui/AnimalSearchSelect";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { Card } from "@/src/components/ui/Card";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useAnimalsQuery } from "@/src/hooks/useAnimals";
+import { useAnimalQuery } from "@/src/hooks/useAnimals";
 import {
   useFieldNotificationReadsQuery,
   useFieldSyncSnapshotQuery,
@@ -71,9 +72,6 @@ export function FieldHomeHubScreen() {
   const myPendingsQuery = useMyFieldPendingValidationsQuery(harasId, user?.id, canAccess);
   const readsQuery = useFieldNotificationReadsQuery(harasId, user?.id, canAccess);
 
-  const femalesQuery = useAnimalsQuery({ haras_id: harasId ?? undefined, sex: "Fêmea", status: "ativo" }, { page: 1, limit: 120 }, canAccess);
-  const animalsQuery = useAnimalsQuery({ haras_id: harasId ?? undefined, status: "ativo" }, { page: 1, limit: 120 }, canAccess);
-
   const [message, setMessage] = useState<{ text: string; tone: "success" | "warning" | "danger" } | null>(null);
 
   const [birthModal, setBirthModal] = useState(false);
@@ -89,21 +87,10 @@ export function FieldHomeHubScreen() {
   const [issueAnimalSearch, setIssueAnimalSearch] = useState("");
   const [issueAnimalId, setIssueAnimalId] = useState("");
   const [issueNote, setIssueNote] = useState("");
-
-  const females = femalesQuery.data?.data ?? [];
-  const animals = animalsQuery.data?.data ?? [];
-
-  const filteredMares = useMemo(
-    () => females.filter((item) => item.name.toLowerCase().includes(birthMareSearch.trim().toLowerCase())),
-    [birthMareSearch, females]
-  );
-  const selectedMare = females.find((item) => item.id === birthMareId) || null;
-
-  const filteredIssueAnimals = useMemo(
-    () => animals.filter((item) => item.name.toLowerCase().includes(issueAnimalSearch.trim().toLowerCase())),
-    [animals, issueAnimalSearch]
-  );
-  const selectedIssueAnimal = animals.find((item) => item.id === issueAnimalId) || null;
+  const selectedMareQuery = useAnimalQuery(birthMareId, canAccess && Boolean(birthMareId));
+  const selectedIssueAnimalQuery = useAnimalQuery(issueAnimalId, canAccess && Boolean(issueAnimalId));
+  const selectedMare = selectedMareQuery.data ?? null;
+  const selectedIssueAnimal = selectedIssueAnimalQuery.data ?? null;
 
   const notifications = useMemo(
     () => fieldNotificationService.toNotifications(myPendingsQuery.data ?? [], readsQuery.data ?? {}),
@@ -300,27 +287,24 @@ export function FieldHomeHubScreen() {
               </View>
             ) : null}
 
-            <TextField value={birthMareSearch} onChangeText={setBirthMareSearch} placeholder="Buscar receptora/matriz pelo nome" />
-            <View style={[styles.selectList, { borderColor: theme.colors.border }]}> 
-              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {filteredMares.slice(0, 30).map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => setBirthMareId(item.id)}
-                    style={({ pressed }) => [
-                      styles.selectItem,
-                      {
-                        borderColor: birthMareId === item.id ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: birthMareId === item.id ? theme.colors.surfaceAlt : "transparent",
-                        opacity: pressed ? 0.82 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: theme.colors.text }}>{item.name}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
+            <AnimalSearchSelect
+              harasId={harasId}
+              enabled={canAccess}
+              filters={{ sex: "Fêmea", status: "ativo" }}
+              selectedId={birthMareId}
+              searchValue={birthMareSearch}
+              onSearchChange={setBirthMareSearch}
+              onSelect={(animal) => {
+                setBirthMareId(animal.id);
+                setBirthMareSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setBirthMareId("");
+                setBirthMareSearch("");
+              }}
+              searchPlaceholder="Buscar receptora/matriz pelo nome"
+              selectedLabelPrefix="Matriz"
+            />
 
             <View style={styles.optionRow}>
               {(["Macho", "Fêmea"] as const).map((value) => (
@@ -379,6 +363,7 @@ export function FieldHomeHubScreen() {
                         setBirthModal(false);
                         setBirthPhotoUri(null);
                         setBirthMareId("");
+                        setBirthMareSearch("");
                         setBirthNote("");
                         refresh();
                         setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
@@ -442,28 +427,24 @@ export function FieldHomeHubScreen() {
               ))}
             </View>
 
-            <TextField value={issueAnimalSearch} onChangeText={setIssueAnimalSearch} placeholder="Animal (opcional)" />
-            <View style={[styles.selectList, { borderColor: theme.colors.border }]}> 
-              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                {filteredIssueAnimals.slice(0, 20).map((item) => (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => setIssueAnimalId(item.id)}
-                    style={({ pressed }) => [
-                      styles.selectItem,
-                      {
-                        borderColor: issueAnimalId === item.id ? theme.colors.primary : theme.colors.border,
-                        backgroundColor: issueAnimalId === item.id ? theme.colors.surfaceAlt : "transparent",
-                        opacity: pressed ? 0.82 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: theme.colors.text }}>{item.name}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-            {selectedIssueAnimal ? <Text style={{ color: theme.colors.success, fontSize: 12, fontWeight: "600" }}>Animal selecionado: {selectedIssueAnimal.name}</Text> : null}
+            <AnimalSearchSelect
+              harasId={harasId}
+              enabled={canAccess}
+              filters={{ status: "ativo" }}
+              selectedId={issueAnimalId}
+              searchValue={issueAnimalSearch}
+              onSearchChange={setIssueAnimalSearch}
+              onSelect={(animal) => {
+                setIssueAnimalId(animal.id);
+                setIssueAnimalSearch(animal.name);
+              }}
+              onClearSelected={() => {
+                setIssueAnimalId("");
+                setIssueAnimalSearch("");
+              }}
+              searchPlaceholder="Animal (opcional)"
+              selectedLabelPrefix="Animal"
+            />
 
             <TextField value={issueNote} onChangeText={setIssueNote} placeholder="Descreva a ocorrencia, observacao ou correcao" multiline style={styles.textArea} />
 
@@ -497,6 +478,7 @@ export function FieldHomeHubScreen() {
                         setIssueModal(false);
                         setIssuePhotoUri(null);
                         setIssueAnimalId("");
+                        setIssueAnimalSearch("");
                         setIssueNote("");
                         refresh();
                         setMessage({ text: result.message, tone: result.synced ? "success" : "warning" });
@@ -567,21 +549,6 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 200,
     borderRadius: 10,
-  },
-  selectList: {
-    borderWidth: 1,
-    borderRadius: 12,
-    minHeight: 110,
-    maxHeight: 170,
-    padding: 8,
-  },
-  selectItem: {
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 38,
-    paddingHorizontal: 10,
-    justifyContent: "center",
-    marginBottom: 8,
   },
   optionRow: { flexDirection: "row", gap: 8 },
   sexButton: {

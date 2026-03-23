@@ -74,11 +74,12 @@ export function FieldAnimalSearchScreen() {
     }),
     [debouncedSearch, harasId]
   );
+  const shouldSearch = debouncedSearch.length >= 2;
 
   const { data, isLoading, isFetching, refetch, error } = useAnimalsQuery(
     filters,
     { page: 1, limit: 100 },
-    canAccess && Boolean(harasId)
+    canAccess && Boolean(harasId) && shouldSearch
   );
 
   const items = data?.data ?? [];
@@ -122,7 +123,9 @@ export function FieldAnimalSearchScreen() {
             <Text style={[styles.title, { color: theme.colors.text }]}>Buscar Animal</Text>
             <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Encontre rápido para consulta em campo.</Text>
             <SearchInput value={searchText} onChangeText={setSearchText} placeholder="Nome ou registro do animal" />
-            <Text style={[styles.resultText, { color: theme.colors.textMuted }]}>{items.length} resultado(s)</Text>
+            <Text style={[styles.resultText, { color: theme.colors.textMuted }]}>
+              {shouldSearch ? `${items.length} resultado(s)` : "Digite ao menos 2 caracteres para buscar"}
+            </Text>
             {error ? (
               <Text style={[styles.errorText, { color: theme.colors.danger }]}>Falha ao carregar. Puxe para atualizar.</Text>
             ) : null}
@@ -141,7 +144,11 @@ export function FieldAnimalSearchScreen() {
         }
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={
-          <EmptyState title="Nenhum animal encontrado" description="Tente outro nome ou número de registro." />
+          shouldSearch ? (
+            <EmptyState title="Nenhum animal encontrado" description="Tente outro nome ou número de registro." />
+          ) : (
+            <EmptyState title="Buscar animal" description="Digite parte do nome ou número de registro para localizar no plantel." />
+          )
         }
         refreshControl={
           <RefreshControl
