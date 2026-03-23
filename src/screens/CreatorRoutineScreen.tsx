@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { AppButton } from "@/src/components/ui/AppButton";
@@ -6,9 +6,10 @@ import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
 import { DateField } from "@/src/components/ui/DateField";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { SearchInput } from "@/src/components/ui/SearchInput";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { useAnimalsQuery } from "@/src/hooks/useAnimals";
+import { useAnimalQuery, useAnimalsQuery } from "@/src/hooks/useAnimals";
 import { useAssignableMembersQuery, useCreateTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/src/hooks/useTasks";
 import { isCreatorRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
@@ -41,7 +42,6 @@ export function CreatorRoutineScreen() {
 
   const canAccess = isCreatorRole(role);
   const tasksQuery = useTasksQuery(harasId ? { haras_id: harasId } : null, canAccess);
-  const animalsQuery = useAnimalsQuery({ haras_id: harasId ?? undefined, status: "ativo" }, { page: 1, limit: 150 }, canAccess);
   const membersQuery = useAssignableMembersQuery(harasId);
   const createTaskMutation = useCreateTaskMutation();
   const updateTaskMutation = useUpdateTaskMutation();
@@ -54,9 +54,35 @@ export function CreatorRoutineScreen() {
   const [priority, setPriority] = useState<TaskPriority>("media");
   const [observations, setObservations] = useState("");
   const [animalId, setAnimalId] = useState("");
+  const [animalSearch, setAnimalSearch] = useState("");
+  const [debouncedAnimalSearch, setDebouncedAnimalSearch] = useState("");
   const [responsibleId, setResponsibleId] = useState("");
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedAnimalSearch(animalSearch);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [animalSearch]);
+
+  const normalizedAnimalSearch = debouncedAnimalSearch.trim();
+  const shouldSearchAnimals = normalizedAnimalSearch.length >= 2;
+  const animalsQuery = useAnimalsQuery(
+    {
+      haras_id: harasId ?? undefined,
+      status: "ativo",
+      search: shouldSearchAnimals ? normalizedAnimalSearch : undefined,
+    },
+    { page: 1, limit: 40 },
+    canAccess && shouldSearchAnimals
+  );
+  const selectedAnimalQuery = useAnimalQuery(animalId, canAccess && Boolean(animalId));
   const animals = animalsQuery.data?.data ?? [];
+  const selectedAnimal = useMemo(() => {
+    if (!animalId) return null;
+    return animals.find((item) => item.id === animalId) ?? selectedAnimalQuery.data ?? null;
+  }, [animalId, animals, selectedAnimalQuery.data]);
   const summary = useMemo(() => {
     const list = tasksQuery.data ?? [];
     return {
@@ -78,6 +104,7 @@ export function CreatorRoutineScreen() {
     setPriority("media");
     setObservations("");
     setAnimalId("");
+    setAnimalSearch("");
     setResponsibleId("");
     setEditingTaskId(null);
   };
@@ -97,6 +124,7 @@ export function CreatorRoutineScreen() {
     setPriority(current.priority);
     setObservations(current.observations || "");
     setAnimalId(current.animal_id || "");
+    setAnimalSearch(current.animal_name || "");
     setResponsibleId(current.responsible_id || "");
     setCreateOpen(true);
   };
@@ -333,13 +361,47 @@ export function CreatorRoutineScreen() {
             </View>
 
             <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Animal (opcional)</Text>
+            <SearchInput value={animalSearch} onChangeText={setAnimalSearch} placeholder="Busque por nome ou registro" />
+            {selectedAnimal ? (
+              <View style={[styles.selectedAnimalRow, { borderColor: theme.colors.success, backgroundColor: `${theme.colors.success}12` }]}>
+                <Text style={[styles.selectedAnimalLabel, { color: theme.colors.success }]} numberOfLines={1}>
+                  Selecionado: {selectedAnimal.name}
+                </Text>
+                <Pressable onPress={() => setAnimalId("")}>
+                  <Text style={[styles.clearSelectionLabel, { color: theme.colors.primary }]}>Remover</Text>
+                </Pressable>
+              </View>
+            ) : null}
             <View style={[styles.selectWrap, { borderColor: theme.colors.border }]}>
-              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={styles.selectContent}>
-                {animals.slice(0, 40).map((animal) => (
-                  <Pressable key={animal.id} onPress={() => setAnimalId(animal.id)} style={[styles.selectItem, { borderColor: animalId === animal.id ? theme.colors.primary : theme.colors.border }]}> 
-                    <Text style={{ color: theme.colors.text }}>{animal.name}</Text>
-                  </Pressable>
-                ))}
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={styles.selectContent} keyboardShouldPersistTaps="handled">
+                {!shouldSearchAnimals ? (
+                  <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
+                    Digite ao menos 2 caracteres para buscar no plantel.
+                  </Text>
+                ) : animalsQuery.isLoading ? (
+                  <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>Buscando animais...</Text>
+                ) : animalsQuery.error ? (
+                  <Text style={[styles.helperText, { color: theme.colors.danger }]}>
+                    {animalsQuery.error instanceof Error ? animalsQuery.error.message : "Falha ao buscar animais."}
+                  </Text>
+                ) : animals.length ? (
+                  animals.map((animal) => (
+                    <Pressable
+                      key={animal.id}
+                      onPress={() => {
+                        setAnimalId(animal.id);
+                        setAnimalSearch(animal.name);
+                      }}
+                      style={[styles.selectItem, { borderColor: animalId === animal.id ? theme.colors.primary : theme.colors.border }]}
+                    >
+                      <Text style={{ color: theme.colors.text }}>{animal.name}</Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
+                    Nenhum animal encontrado para essa busca.
+                  </Text>
+                )}
               </ScrollView>
             </View>
 
@@ -443,6 +505,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 10,
   },
+  helperText: { fontSize: 12, lineHeight: 18 },
+  selectedAnimalRow: {
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  selectedAnimalLabel: { flex: 1, fontSize: 12, fontWeight: "600" },
+  clearSelectionLabel: { fontSize: 12, fontWeight: "700" },
   textArea: { minHeight: 90 },
   modalActions: { gap: 8, marginTop: 6 },
 });
