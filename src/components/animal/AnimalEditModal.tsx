@@ -10,11 +10,20 @@ import {
   View,
 } from "react-native";
 import { Lock, X } from "lucide-react-native";
+import { AnimalLocationPicker } from "@/src/components/animal/AnimalLocationPicker";
 import { AnimalSearchSelect } from "@/src/components/ui/AnimalSearchSelect";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { DateField } from "@/src/components/ui/DateField";
 import { TextField } from "@/src/components/ui/TextField";
 import { useUpdateAnimalMutation } from "@/src/hooks/useAnimals";
+import {
+  buildAnimalLocationLabel,
+  extractLocationName,
+  normalizeServiceType,
+  resolveLocationTypeFromLabel,
+  type AnimalLocationType,
+  type AnimalServiceType,
+} from "@/src/lib/animal-location";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type {
   Animal,
@@ -41,8 +50,9 @@ interface FormState {
   coatColor: string;
   status: AnimalStatus;
   managementStatus: string;
-  location: string;
-  serviceType: string;
+  locationType: AnimalLocationType;
+  locationName: string;
+  serviceType: AnimalServiceType | "";
   originHaras: string;
   heightCm: string;
   weightKg: string;
@@ -90,6 +100,13 @@ function parseNumber(value: string): number | null {
 }
 
 function buildInitialState(animal: Animal): FormState {
+  const resolvedLocationType = resolveLocationTypeFromLabel(
+    animal.location,
+    animal.service_type
+  );
+  const resolvedServiceType = normalizeServiceType(animal.service_type) ?? "";
+  const resolvedLocationName = extractLocationName(animal.location, resolvedLocationType);
+
   return {
     name: animal.name ?? "",
     registry: animal.registry_number ?? "",
@@ -101,8 +118,9 @@ function buildInitialState(animal: Animal): FormState {
     coatColor: animal.coat_color ?? "",
     status: animal.status,
     managementStatus: animal.management_status ?? "",
-    location: animal.location ?? "",
-    serviceType: animal.service_type ?? "",
+    locationType: resolvedLocationType,
+    locationName: resolvedLocationName,
+    serviceType: resolvedLocationType === "Servico" ? resolvedServiceType || "Outro" : "",
     originHaras: animal.origin_haras ?? "",
     heightCm: animal.height != null ? String(animal.height) : "",
     weightKg: animal.weight != null ? String(animal.weight) : "",
@@ -148,12 +166,18 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
       return;
     }
 
+    const resolvedLocationLabel = form.locationName
+      ? buildAnimalLocationLabel(form.locationType, form.locationName, form.serviceType || null)
+      : null;
+    const resolvedServiceType =
+      form.locationType === "Servico" && form.serviceType ? form.serviceType : null;
+
     const input: UpdateAnimalInput = {
       brand: normalizeString(form.brand),
       status: form.status,
       management_status: normalizeString(form.managementStatus),
-      location: normalizeString(form.location),
-      service_type: normalizeString(form.serviceType),
+      location: resolvedLocationLabel,
+      service_type: resolvedServiceType,
       origin_haras: normalizeString(form.originHaras),
       height: heightValue,
       weight: weightValue,
@@ -387,17 +411,23 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
             <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>
               Localização
             </Text>
-            <TextField
-              label="Local atual"
-              value={form.location}
-              onChangeText={(value) => setField("location", value)}
-              placeholder="Ex: Baia 3 / Pasto Norte"
-            />
-            <TextField
-              label="Tipo de serviço"
-              value={form.serviceType}
-              onChangeText={(value) => setField("serviceType", value)}
-              placeholder="Ex: Reprodução / Treinamento"
+            <Text style={[styles.helperLine, { color: theme.colors.textMuted }]}>
+              Os ambientes disponíveis (baias, pastos, serviços) são cadastrados na gestão do haras
+              na versão web.
+            </Text>
+            <AnimalLocationPicker
+              harasId={animal.haras_id}
+              locationType={form.locationType}
+              locationName={form.locationName}
+              serviceType={form.serviceType}
+              onChange={(next) =>
+                setForm((prev) => ({
+                  ...prev,
+                  locationType: next.locationType,
+                  locationName: next.locationName,
+                  serviceType: next.serviceType,
+                }))
+              }
             />
 
             <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Medidas</Text>
