@@ -89,7 +89,7 @@ export function ForgotPasswordScreen() {
 
           {isSent ? (
             <Text style={[styles.feedback, { color: theme.colors.success }]}>
-              Email enviado com sucesso. Verifique sua caixa de entrada.
+              Verifique seu email. O link abrirá o CriaHub automaticamente para você criar a nova senha.
             </Text>
           ) : null}
         </Card>
