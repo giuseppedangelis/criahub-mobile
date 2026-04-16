@@ -32,7 +32,7 @@ import { LoadingState } from "@/src/components/ui/LoadingState";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
 import { OwnershipSection } from "@/src/components/ownership/OwnershipSection";
 import { useAuth } from "@/src/contexts/AuthContext";
-import { isCreatorRole } from "@/src/lib/roles";
+import { isCreatorRole, isFieldStaffRole, isVeterinaryRole } from "@/src/lib/roles";
 import { useAnimalDetailsQuery } from "@/src/hooks/useAnimalDetails";
 import { useAnimalQuery } from "@/src/hooks/useAnimals";
 import { useAppTheme } from "@/src/theme/ThemeContext";
@@ -136,6 +136,10 @@ export function AnimalDetailScreen() {
   const { theme } = useAppTheme();
   const { role } = useAuth();
   const canEdit = isCreatorRole(role);
+  // RLS: animals UPDATE aceita criador/veterinário/funcionário (peão não).
+  const canTogglePresence = isCreatorRole(role) || isVeterinaryRole(role) || !isFieldStaffRole(role);
+  // RLS: animal_ownership_shares INSERT/UPDATE exige user_can_manage_haras_team (criador/assessor/admin).
+  const canManageShares = isCreatorRole(role);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const modalViewportWidth = Math.min(screenWidth - 32, 460);
   const modalViewportHeight = Math.min(Math.max(screenHeight * 0.68, 300), 520);
@@ -647,6 +651,8 @@ export function AnimalDetailScreen() {
               animalBirthDate={animal.birth_date}
               isAtHaras={animal.is_at_haras}
               defaultOwnerName={animal.proprietario ?? animal.criador ?? null}
+              canTogglePresence={canTogglePresence}
+              canManageShares={canManageShares}
             />
             <Card>
               <SectionTitle title="Histórico de localização" />

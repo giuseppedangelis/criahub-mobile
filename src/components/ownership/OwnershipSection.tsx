@@ -18,6 +18,10 @@ interface OwnershipSectionProps {
   animalBirthDate: string | null;
   isAtHaras: boolean;
   defaultOwnerName: string | null;
+  /** Permite alternar o switch de presença (RLS: animals UPDATE aceita criador, vet, funcionário). */
+  canTogglePresence?: boolean;
+  /** Permite editar cotistas (RLS: user_can_manage_haras_team — só admin/criador/assessor). */
+  canManageShares?: boolean;
 }
 
 function formatTerminationDescription(share: AnimalOwnershipShare, birthDate: string | null) {
@@ -50,6 +54,8 @@ export function OwnershipSection({
   animalBirthDate,
   isAtHaras,
   defaultOwnerName,
+  canTogglePresence = false,
+  canManageShares = false,
 }: OwnershipSectionProps) {
   const { theme } = useAppTheme();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -84,7 +90,7 @@ export function OwnershipSection({
           <Switch
             value={isAtHaras}
             onValueChange={onTogglePresence}
-            disabled={presenceMutation.isPending}
+            disabled={!canTogglePresence || presenceMutation.isPending}
             trackColor={{ true: theme.colors.success, false: theme.colors.surfaceAlt }}
             thumbColor={theme.colors.primary}
           />
@@ -104,11 +110,13 @@ export function OwnershipSection({
       <Card>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: theme.colors.text }]}>Propriedade</Text>
-          <AppButton
-            label={shares.length === 0 ? "Cadastrar cotistas" : "Gerenciar"}
-            variant="ghost"
-            onPress={() => setIsEditorOpen(true)}
-          />
+          {canManageShares ? (
+            <AppButton
+              label={shares.length === 0 ? "Cadastrar cotistas" : "Gerenciar"}
+              variant="ghost"
+              onPress={() => setIsEditorOpen(true)}
+            />
+          ) : null}
         </View>
 
         {sharesQuery.isLoading ? (
@@ -119,8 +127,9 @@ export function OwnershipSection({
 
         {!sharesQuery.isLoading && shares.length === 0 ? (
           <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-            Nenhum cotista cadastrado. Use "Cadastrar cotistas" para registrar dono único ou
-            condomínio.
+            {canManageShares
+              ? 'Nenhum cotista cadastrado. Use "Cadastrar cotistas" para registrar dono único ou condomínio.'
+              : "Nenhum cotista cadastrado."}
           </Text>
         ) : null}
 
