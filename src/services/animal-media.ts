@@ -45,35 +45,51 @@ export const animalMediaService = {
       .upload(path, blob, { cacheControl: "3600", upsert: false, contentType });
     if (uploadError) handleSupabaseError(uploadError);
 
-    const { data: urlData } = supabase.storage.from("animal-photos").getPublicUrl(path);
-    const publicUrl = urlData?.publicUrl;
-    if (!publicUrl) throw new Error("Erro ao obter URL da foto enviada.");
-
-    const { data: current, error: readError } = await supabase
-      .from("animals")
-      .select("images, foto_url")
-      .eq("id", animalId)
-      .eq("haras_id", harasId)
-      .single();
-    if (readError) handleSupabaseError(readError);
-
-    const nextImages = Array.isArray(current?.images) ? [...current.images] : [];
-    nextImages.push(publicUrl);
-
-    const payload: Record<string, unknown> = {
-      images: nextImages,
-      updated_at: new Date().toISOString(),
+    // A partir daqui, qualquer falha precisa remover o arquivo do storage
+    // para não deixar mídia órfã.
+    const rollback = async () => {
+      try {
+        await supabase.storage.from("animal-photos").remove([path]);
+      } catch {
+        // nada a fazer — log silencioso já cobre em outros fluxos
+      }
     };
-    if (!current?.foto_url) payload.foto_url = publicUrl;
 
-    const { error: updateError } = await supabase
-      .from("animals")
-      .update(payload)
-      .eq("id", animalId)
-      .eq("haras_id", harasId);
-    if (updateError) handleSupabaseError(updateError);
+    try {
+      const { data: urlData } = supabase.storage.from("animal-photos").getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) throw new Error("Erro ao obter URL da foto enviada.");
 
-    return nextImages;
+      const { data: current, error: readError } = await supabase
+        .from("animals")
+        .select("images, foto_url")
+        .eq("id", animalId)
+        .eq("haras_id", harasId)
+        .maybeSingle();
+      if (readError) throw new Error(readError.message);
+      if (!current) throw new Error("Animal não encontrado para anexar a foto.");
+
+      const nextImages = Array.isArray(current.images) ? [...current.images] : [];
+      nextImages.push(publicUrl);
+
+      const payload: Record<string, unknown> = {
+        images: nextImages,
+        updated_at: new Date().toISOString(),
+      };
+      if (!current.foto_url) payload.foto_url = publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("animals")
+        .update(payload)
+        .eq("id", animalId)
+        .eq("haras_id", harasId);
+      if (updateError) throw new Error(updateError.message);
+
+      return nextImages;
+    } catch (err) {
+      await rollback();
+      throw err instanceof Error ? err : new Error("Falha ao anexar foto.");
+    }
   },
 
   async removePhoto(
@@ -185,19 +201,32 @@ export const animalMediaService = {
       });
     if (uploadError) handleSupabaseError(uploadError);
 
-    const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
-    const publicUrl = urlData?.publicUrl;
-    if (!publicUrl) throw new Error("Erro ao obter URL do documento.");
+    const rollback = async () => {
+      try {
+        await supabase.storage.from("documents").remove([path]);
+      } catch {
+        // silencioso
+      }
+    };
 
-    const { error: insertError } = await supabase.from("documents").insert({
-      animal_id: animalId,
-      haras_id: harasId,
-      titulo: input.titulo.trim() || input.fileName,
-      tipo: input.tipo.trim() || "outro",
-      file_url: publicUrl,
-      observacoes: input.observacoes?.trim() || null,
-    });
-    if (insertError) handleSupabaseError(insertError);
+    try {
+      const { data: urlData } = supabase.storage.from("documents").getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) throw new Error("Erro ao obter URL do documento.");
+
+      const { error: insertError } = await supabase.from("documents").insert({
+        animal_id: animalId,
+        haras_id: harasId,
+        titulo: input.titulo.trim() || input.fileName,
+        tipo: input.tipo.trim() || "outro",
+        file_url: publicUrl,
+        observacoes: input.observacoes?.trim() || null,
+      });
+      if (insertError) throw new Error(insertError.message);
+    } catch (err) {
+      await rollback();
+      throw err instanceof Error ? err : new Error("Falha ao enviar documento.");
+    }
   },
 
   async removeDocument(documentId: string, harasId: string): Promise<void> {

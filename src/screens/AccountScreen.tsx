@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -199,9 +200,53 @@ export function AccountScreen() {
       <Card>
         <AppButton
           label="Sair da conta"
-          variant="danger"
+          variant="ghost"
           onPress={() => {
             void signOut();
+          }}
+        />
+        <AppButton
+          label="Solicitar exclusão da conta"
+          variant="danger"
+          onPress={() => {
+            Alert.alert(
+              "Excluir conta",
+              "Vamos abrir seu e-mail com uma solicitação pré-preenchida para o suporte do CriaHub. Seus dados serão removidos em até 30 dias após a confirmação.",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Continuar",
+                  style: "destructive",
+                  onPress: async () => {
+                    const email = profile?.email ?? user?.email ?? "(não informado)";
+                    const userId = user?.id ?? "(não informado)";
+                    const subject = encodeURIComponent(
+                      "Solicitação de exclusão de conta CriaHub"
+                    );
+                    const body = encodeURIComponent(
+                      `Olá,\n\nSolicito a exclusão permanente da minha conta no CriaHub e de todos os dados associados.\n\nEmail da conta: ${email}\nID do usuário: ${userId}\n\nObrigado.`
+                    );
+                    const url = `mailto:suporte@criahub.com.br?subject=${subject}&body=${body}`;
+                    try {
+                      const canOpen = await Linking.canOpenURL(url);
+                      if (!canOpen) {
+                        Alert.alert(
+                          "Abra seu e-mail",
+                          "Envie um pedido para suporte@criahub.com.br com o assunto 'Solicitação de exclusão de conta' informando seu email e ID do usuário."
+                        );
+                        return;
+                      }
+                      await Linking.openURL(url);
+                    } catch {
+                      Alert.alert(
+                        "Erro",
+                        "Não foi possível abrir o app de e-mail. Envie um pedido manualmente para suporte@criahub.com.br."
+                      );
+                    }
+                  },
+                },
+              ]
+            );
           }}
         />
       </Card>
