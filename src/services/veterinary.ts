@@ -60,9 +60,13 @@ async function ensureOnline() {
   }
 }
 
-async function getAnimalNamesMap(ids: string[]) {
+async function getAnimalNamesMap(ids: string[], harasId: string) {
   if (ids.length === 0) return new Map<string, string>();
-  const { data, error } = await supabase.from("animals").select("id, nome").in("id", ids);
+  const { data, error } = await supabase
+    .from("animals")
+    .select("id, nome")
+    .eq("haras_id", harasId)
+    .in("id", ids);
   if (error) handleSupabaseError(error);
   return new Map((data ?? []).map((item) => [item.id, item.nome]));
 }
@@ -480,7 +484,7 @@ export const veterinaryService = {
       if (cycleRes.error) handleSupabaseError(cycleRes.error);
 
       const animalIds = Array.from(new Set((tasksRes.data ?? []).map((item) => item.animal_id).filter(Boolean))) as string[];
-      const namesMap = await getAnimalNamesMap(animalIds);
+      const namesMap = await getAnimalNamesMap(animalIds, harasId);
 
       const todayTasks: VetTaskItem[] = (tasksRes.data ?? []).map((item) => ({
         id: item.id,
@@ -527,7 +531,7 @@ export const veterinaryService = {
       if (error) handleSupabaseError(error);
 
       const ids = Array.from(new Set((data ?? []).map((item) => item.stallion_id)));
-      const namesMap = await getAnimalNamesMap(ids);
+      const namesMap = await getAnimalNamesMap(ids, harasId);
 
       const response = (data ?? []).map((item) => ({
         id: item.id,
