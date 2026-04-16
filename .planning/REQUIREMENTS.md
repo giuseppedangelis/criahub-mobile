@@ -121,6 +121,44 @@ Todos os requisitos deste milestone são **corretivos** — cada um fecha um bug
 
 ## Traceability
 
-<!-- Preenchido pelo gsd-roadmapper quando ROADMAP.md for criado. Mapeia cada REQ-ID à fase que o entrega. -->
+<!-- Preenchido pelo gsd-roadmapper em 2026-04-16. Mapeia cada REQ-ID à fase que o entrega. -->
 
-(Pending roadmap creation)
+| REQ-ID | Priority | Phase | Status |
+|--------|----------|-------|--------|
+| AUTH-01 | P0 | Phase 1 | Pending |
+| NOTIF-01 | P0 | Phase 1 | Pending |
+| RLS-01 | P0 | Phase 2 | Pending |
+| RLS-02 | P0 | Phase 2 | Pending |
+| PERM-01 | P0 | Phase 2 | Pending |
+| OFFLINE-01 | P0 | Phase 3 | Pending |
+| OFFLINE-02 | P0 | Phase 3 | Pending |
+| APPLE-01 | P0 | Phase 4 | Pending |
+| AUTH-02 | P1 | Phase 5 | Pending |
+| RLS-03 | P1 | Phase 5 | Pending |
+| PERM-02 | P1 | Phase 5 | Pending |
+| OFFLINE-03 | P1 | Phase 5 | Pending |
+| OFFLINE-04 | P1 | Phase 5 | Pending |
+| OWN-01 | P1 | Phase 5 | Pending |
+| OWN-02 | P1 | Phase 5 | Pending |
+| PERF-01 | P1 | Phase 5 | Pending |
+| UX-01 | P1 | Phase 5 | Pending |
+| UX-02 | P1 | Phase 5 | Pending |
+| UX-03 | P1 | Phase 5 | Pending |
+| MONO-01 | P1 | Phase 5 | Pending |
+| PAR-01 | P1 | Phase 5 | Pending |
+| PAR-03 | P1 | Phase 5 | Pending |
+| TEST-01 | P1 | Phase 5 | Pending |
+| RLS-04 | P2 | Phase 6 | Pending |
+| RLS-05 | P2 | Phase 6 | Pending |
+| OFFLINE-05 | P2 | Phase 6 | Pending |
+| PERF-02 | P2 | Phase 6 | Pending |
+| UX-04 | P2 | Phase 6 | Pending |
+| UX-05 | P2 | Phase 6 | Pending |
+| MONO-02 | P2 | Phase 6 | Pending |
+| PAR-02 | P2 | Phase 6 | Pending |
+| SEC-01 | P2 | Phase 6 | Pending |
+| SEC-02 | P2 | Phase 6 | Pending |
+
+**Coverage:** 33/33 v1 REQs mapeados; 0 orphans; 0 duplicates.
+
+**Phase totals:** Phase 1 (2) + Phase 2 (3) + Phase 3 (2) + Phase 4 (1) + Phase 5 (15) + Phase 6 (10) = 33.
