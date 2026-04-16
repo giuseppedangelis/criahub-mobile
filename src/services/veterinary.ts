@@ -1,12 +1,15 @@
 import NetInfo from "@react-native-community/netinfo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
+  clearDeadVeterinaryActions,
   enqueueVeterinaryOfflineAction,
   getVeterinarySyncSnapshot,
   isNetworkLikeError,
+  MAX_VET_RETRIES,
   readVeterinaryOfflineQueue,
-  writeVeterinaryLastSync,
   type VeterinaryMutationResult,
+  type VeterinaryOfflineAction,
+  writeVeterinaryLastSync,
   writeVeterinaryOfflineQueue,
 } from "@/src/services/veterinary-offline";
 import { mapTaskPriorityFromDb, mapTaskStatusFromDb } from "@/src/lib/vet-shared";
@@ -58,6 +61,25 @@ async function ensureOnline() {
   if (state.isConnected === false) {
     throw new Error("offline");
   }
+}
+
+function buildVetRetryAtIso(retryCount: number) {
+  const seconds = Math.min(15 * 60, 30 * 2 ** Math.max(0, retryCount - 1));
+  return new Date(Date.now() + seconds * 1000).toISOString();
+}
+
+function toVetQueueFailureItem(item: VeterinaryOfflineAction, error: unknown): VeterinaryOfflineAction {
+  const message = error instanceof Error ? error.message : "Erro ao sincronizar ação offline.";
+  const retryCount = (item.retry_count ?? 0) + 1;
+  const isDead = retryCount >= MAX_VET_RETRIES;
+  return {
+    ...item,
+    retry_count: retryCount,
+    last_error: message,
+    last_attempt_at: new Date().toISOString(),
+    next_retry_at: isDead ? null : buildVetRetryAtIso(retryCount),
+    dead: isDead ? true : item.dead,
+  };
 }
 
 async function getAnimalNamesMap(ids: string[], harasId: string) {
@@ -641,6 +663,15 @@ export const veterinaryService = {
     const remaining: typeof queue = [];
 
     for (const item of queue) {
+      if (item.dead) {
+        remaining.push(item);
+        continue;
+      }
+      if (item.next_retry_at && new Date(item.next_retry_at).getTime() > Date.now()) {
+        remaining.push(item);
+        continue;
+      }
+
       try {
         if (item.type === "create_reproductive_exam") {
           await executeCreateReproductiveExam(item.payload as ReproductiveExamInput);
@@ -657,8 +688,8 @@ export const veterinaryService = {
         } else if (item.type === "create_treatment") {
           await executeCreateTreatment(item.payload as TreatmentInput);
         }
-      } catch {
-        remaining.push(item);
+      } catch (error) {
+        remaining.push(toVetQueueFailureItem(item, error));
       }
     }
 
