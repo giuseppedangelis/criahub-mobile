@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -36,6 +37,7 @@ import {
 import { useGestationsQuery } from "@/src/hooks/useReproduction";
 import { isFieldStaffRole } from "@/src/lib/roles";
 import { fieldNotificationService } from "@/src/services/field-notifications";
+import { fieldService } from "@/src/services/field";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type {
   FieldPendingValidationStatus,
@@ -219,6 +221,37 @@ export function FieldHomeScreen() {
           setMessage({ text: error instanceof Error ? error.message : "Falha ao sincronizar agora.", tone: "danger" });
         },
       });
+  };
+
+  const handleClearDead = () => {
+    const deadCount = syncQuery.data?.dead_count ?? 0;
+    if (deadCount <= 0) return;
+    Alert.alert(
+      "Descartar falhas permanentes?",
+      `${deadCount} item(ns) não puderam ser sincronizados após 10 tentativas. Esta ação remove os itens do app e não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Descartar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const removed = await fieldService.clearDeadActions();
+              await syncQuery.refetch();
+              setMessage({
+                text: `${removed} falha(s) permanente(s) descartada(s).`,
+                tone: "success",
+              });
+            } catch (error) {
+              setMessage({
+                text: error instanceof Error ? error.message : "Falha ao descartar itens.",
+                tone: "danger",
+              });
+            }
+          },
+        },
+      ],
+    );
   };
 
   useEffect(() => {
@@ -583,6 +616,13 @@ export function FieldHomeScreen() {
           onPress={runSyncWithFeedback}
           loading={flushQueue.isPending}
         />
+        {syncQuery.data?.dead_count != null && syncQuery.data.dead_count > 0 ? (
+          <AppButton
+            variant="ghost"
+            label={`Descartar ${syncQuery.data.dead_count} falha(s) permanente(s)`}
+            onPress={handleClearDead}
+          />
+        ) : null}
       </Card>
 
       <Pressable
