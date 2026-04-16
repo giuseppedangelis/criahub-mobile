@@ -11,6 +11,12 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
 import { resolveUserHarasId } from "@/src/lib/haras";
 import { normalizeRole } from "@/src/lib/roles";
+import {
+  clearAllReminders,
+  clearOwnerUserId,
+  readOwnerUserId,
+  writeOwnerUserId,
+} from "@/src/lib/notifications";
 import type { UserProfile, UserRole } from "@/src/types/domain";
 
 interface AuthContextValue {
@@ -115,6 +121,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
       async (_event, nextSession) => {
         if (!mounted) return;
 
+        // NOTIF-01 D-10: detecta troca de usuário no mesmo device ANTES de
+        // trocar a state, para não vazar lembretes do usuário anterior.
+        // Este handler dispara também em INITIAL_SESSION no mount (supabase-js v2),
+        // então cobre tanto o caso de troca em tempo real quanto o bootstrap inicial
+        // quando há sessão persistida — sem duplicar a lógica em bootstrap().
+        const nextUserId = nextSession?.user?.id ?? null;
+        const storedOwnerId = await readOwnerUserId();
+
+        if (nextUserId) {
+          if (storedOwnerId !== nextUserId) {
+            await clearAllReminders();
+            await writeOwnerUserId(nextUserId);
+          }
+        } else if (storedOwnerId) {
+          // Sessão terminou por qualquer via (signOut, refresh-fail, etc.)
+          await clearAllReminders();
+          await clearOwnerUserId();
+        }
+
+        if (!mounted) return;
+
         setSession(nextSession);
         setUser(nextSession?.user ?? null);
 
@@ -146,6 +173,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // NOTIF-01 D-09: cancelar reminders + owner antes de limpar state para evitar
+    // que usuário B receba lembretes de A no mesmo device.
+    try {
+      await clearAllReminders();
+      await clearOwnerUserId();
+    } catch {
+      // clearAllReminders/clearOwnerUserId já silenciam erros internamente;
+      // catch aqui é defensivo contra regressão futura.
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
     clearUserState();
