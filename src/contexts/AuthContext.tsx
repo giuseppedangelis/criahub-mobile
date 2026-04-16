@@ -188,7 +188,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [clearUserState]);
 
   const resetPassword = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // AUTH-01 D-01: redirectTo aponta para o scheme custom do app para que o link
+    // do email abra direto a rota /(auth)/reset-password. Universal Link fica
+    // para milestone dedicado (exige apple-app-site-association + assetlinks).
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "criahubmobile://reset-password",
+    });
     if (error) throw new Error(error.message);
   }, []);
 
