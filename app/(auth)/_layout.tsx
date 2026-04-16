@@ -92,7 +92,9 @@ export default function AuthLayout() {
 
         // AUTH-01 D-05: navega para a tela de reset. router.replace evita
         // empilhar histórico com o link que estava sendo processado.
-        router.replace("/(auth)/reset-password");
+        // `as any`: rota nova não aparece ainda nos types auto-gerados pelo Expo
+        // Router até o dev server rodar uma vez. Padrão já usado em AccountScreen.
+        router.replace("/(auth)/reset-password" as any);
       } finally {
         if (mounted) setIsProcessingDeepLink(false);
       }
