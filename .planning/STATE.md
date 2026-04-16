@@ -1,6 +1,6 @@
 # STATE — CriaHub Mobile
 
-**Last updated:** 2026-04-16
+**Last updated:** 2026-04-16 (phase 1 context gathered)
 
 ## Project Reference
 
@@ -11,9 +11,9 @@
 
 ## Current Position
 
-**Phase:** Not started (awaiting `/gsd-plan-phase 1`)
+**Phase:** 1 — Auth & Notifications Security (context gathered)
 **Plan:** —
-**Status:** Roadmap created, ready for planning
+**Status:** Phase 1 context captured; ready for `/gsd-plan-phase 1`
 **Progress:** [░░░░░░░░░░] 0% (0/33 requirements complete)
 
 ### Phase Queue
@@ -50,7 +50,7 @@
 
 ### Open Todos
 
-- [ ] Executar `/gsd-plan-phase 1` para iniciar Phase 1 (Auth & Notifications Security)
+- [ ] Executar `/gsd-plan-phase 1` usando `.planning/phases/01-auth-notifications-security/01-CONTEXT.md` como input
 
 ### Blockers
 
@@ -64,7 +64,7 @@ _None._
 
 ## Session Continuity
 
-**Last command:** `/gsd-roadmap` (initial creation)
+**Last command:** `/gsd-discuss-phase 1`
 **Next expected command:** `/gsd-plan-phase 1`
 **Context files ready:**
 - `.planning/PROJECT.md` — context, constraints, decisions
@@ -72,5 +72,7 @@ _None._
 - `.planning/ROADMAP.md` — 6 fases + success criteria + dependências
 - `.planning/codebase/CONCERNS.md` — bugs conhecidos com arquivo:linha e fix proposto
 - `.planning/config.json` — granularity=coarse, parallelization=false, workflow flags
+- `.planning/phases/01-auth-notifications-security/01-CONTEXT.md` — 17 decisões (D-01 a D-17) cobrindo deep link strategy, reset password surface, session collision, clearAllReminders scope, edge cases
+- `.planning/phases/01-auth-notifications-security/01-DISCUSSION-LOG.md` — audit trail das 5 áreas discutidas
 
-**Resume here:** Phase 1 planning. Start with AUTH-01 (deeplink `criahubmobile://reset-password` + `redirectTo` no `resetPasswordForEmail`) e NOTIF-01 (chamar `clearAllReminders()` no `signOut` do `AuthContext`). Ambos são arquivos pequenos e isolados.
+**Resume here:** Phase 1 planning. Context da Fase 1 já capturado. Próximo passo é `/gsd-plan-phase 1` que vai consumir o 01-CONTEXT.md e produzir PLAN.md(s) para AUTH-01 (criar `app/(auth)/reset-password.tsx` + `ResetPasswordScreen.tsx` + listener de deep link em `(auth)/_layout.tsx` + `redirectTo` no `resetPasswordForEmail`) e NOTIF-01 (`clearAllReminders` no signOut + user-mismatch detection via AsyncStorage `@criahub:notifications/owner-user-id-v1` no `onAuthStateChange`).
