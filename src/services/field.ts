@@ -324,6 +324,10 @@ export const fieldService = {
     return getFieldSyncSnapshot();
   },
 
+  clearDeadActions() {
+    return clearDeadFieldActions();
+  },
+
   async listMyPendingValidations(harasId: string, userId: string): Promise<FieldPendingValidationItem[]> {
     const [{ data, error }, offlineQueue] = await Promise.all([
       supabase

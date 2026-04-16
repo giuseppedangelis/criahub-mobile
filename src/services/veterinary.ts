@@ -648,6 +648,10 @@ export const veterinaryService = {
     return getVeterinarySyncSnapshot();
   },
 
+  clearDeadActions() {
+    return clearDeadVeterinaryActions();
+  },
+
   async flushOfflineQueue() {
     await ensureOnline();
     const queue = await readVeterinaryOfflineQueue();
