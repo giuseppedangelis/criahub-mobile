@@ -11,7 +11,6 @@ import type {
   AnimalFilters,
   AnimalRelative,
   AnimalStatus,
-  CreateAnimalInput,
   PaginatedResponse,
   PaginationParams,
   UpdateAnimalInput,
@@ -261,51 +260,6 @@ export const animalsService = {
         mother,
       },
     };
-  },
-
-  async create(input: CreateAnimalInput): Promise<Animal> {
-    if (!input.haras_id) throw new Error("Haras não identificado.");
-    if (!input.name?.trim()) throw new Error("Informe o nome do animal.");
-
-    const payload: Record<string, unknown> = {
-      haras_id: input.haras_id,
-      nome: input.name.trim(),
-      registro: input.registry_number?.trim() || null,
-      chip: input.chip_number?.trim() || null,
-      marca: input.brand?.trim() || null,
-      sexo: input.sex,
-      categoria: CATEGORY_MAPPING[input.category] ?? input.category,
-      pelagem: input.coat_color?.trim() || null,
-      data_nascimento: input.birth_date || null,
-      status: STATUS_MAPPING_APP_TO_DB[input.status ?? "ativo"] ?? "Ativo",
-      status_manejo: input.management_status?.trim() || null,
-      localizacao: input.location?.trim() || null,
-      tipo_servico: input.service_type?.trim() || null,
-      pai_id: input.father_id || null,
-      mae_id: input.mother_id || null,
-      father_name: input.father_name?.trim() || null,
-      mother_name: input.mother_name?.trim() || null,
-      criador: input.criador?.trim() || null,
-      proprietario: input.proprietario?.trim() || null,
-      haras_origem: input.origin_haras?.trim() || null,
-      height: input.height ?? null,
-      weight: input.weight ?? null,
-      observacoes: input.observations?.trim() || null,
-      images: [],
-      documents: [],
-      is_at_haras: true,
-      presence_manual_override: false,
-      ingestion_source: "manual",
-    };
-
-    const { data, error } = await supabase
-      .from("animals")
-      .insert(payload)
-      .select(ANIMAL_SELECT_FIELDS)
-      .single();
-
-    if (error) handleSupabaseError(error);
-    return mapAnimalFromDb(data);
   },
 
   async update(id: string, harasId: string, input: UpdateAnimalInput): Promise<void> {

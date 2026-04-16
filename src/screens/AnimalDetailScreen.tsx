@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { Pencil } from "lucide-react-native";
-import { AnimalFormModal } from "@/src/components/animal/AnimalFormModal";
+import { AnimalEditModal } from "@/src/components/animal/AnimalEditModal";
 import {
   AddDocumentButton,
   AddPhotoButton,
@@ -902,11 +902,9 @@ export function AnimalDetailScreen() {
       </ScrollView>
 
       {canEdit && isEditOpen ? (
-        <AnimalFormModal
+        <AnimalEditModal
           visible={isEditOpen}
           onClose={() => setIsEditOpen(false)}
-          mode="edit"
-          harasId={animal.haras_id}
           animal={animal}
         />
       ) : null}

@@ -3,7 +3,6 @@ import { animalsService } from "@/src/services/animals";
 import { animalDetailsKeys } from "@/src/hooks/useAnimalDetails";
 import type {
   AnimalFilters,
-  CreateAnimalInput,
   PaginationParams,
   UpdateAnimalInput,
 } from "@/src/types/domain";
@@ -34,16 +33,6 @@ export function useAnimalQuery(id: string, enabled = true) {
     queryKey: animalKeys.detail(id),
     queryFn: () => animalsService.getById(id),
     enabled: enabled && Boolean(id),
-  });
-}
-
-export function useCreateAnimalMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateAnimalInput) => animalsService.create(input),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: animalKeys.all });
-    },
   });
 }
 

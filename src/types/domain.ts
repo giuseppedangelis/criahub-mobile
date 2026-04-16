@@ -141,32 +141,6 @@ export interface UpcomingTerminationItem {
   primary_owner: string | null;
 }
 
-export interface CreateAnimalInput {
-  haras_id: string;
-  name: string;
-  registry_number?: string | null;
-  chip_number?: string | null;
-  brand?: string | null;
-  sex: AnimalSex;
-  category: AnimalCategory;
-  birth_date?: string | null;
-  coat_color?: string | null;
-  status?: AnimalStatus;
-  management_status?: string | null;
-  location?: string | null;
-  service_type?: string | null;
-  father_id?: string | null;
-  mother_id?: string | null;
-  father_name?: string | null;
-  mother_name?: string | null;
-  criador?: string | null;
-  proprietario?: string | null;
-  origin_haras?: string | null;
-  height?: number | null;
-  weight?: number | null;
-  observations?: string | null;
-}
-
 export interface UpdateAnimalInput {
   name?: string;
   registry_number?: string | null;

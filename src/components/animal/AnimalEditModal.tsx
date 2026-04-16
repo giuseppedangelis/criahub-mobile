@@ -14,29 +14,20 @@ import { AnimalSearchSelect } from "@/src/components/ui/AnimalSearchSelect";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { DateField } from "@/src/components/ui/DateField";
 import { TextField } from "@/src/components/ui/TextField";
-import {
-  useCreateAnimalMutation,
-  useUpdateAnimalMutation,
-} from "@/src/hooks/useAnimals";
+import { useUpdateAnimalMutation } from "@/src/hooks/useAnimals";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type {
   Animal,
   AnimalCategory,
   AnimalSex,
   AnimalStatus,
-  CreateAnimalInput,
   UpdateAnimalInput,
 } from "@/src/types/domain";
 
-type FormMode = "create" | "edit";
-
-interface AnimalFormModalProps {
+interface AnimalEditModalProps {
   visible: boolean;
   onClose: () => void;
-  mode: FormMode;
-  harasId: string;
-  animal?: Animal | null;
-  onCreated?: (animal: Animal) => void;
+  animal: Animal;
 }
 
 interface FormState {
@@ -100,36 +91,7 @@ function parseNumber(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function buildCreateState(): FormState {
-  return {
-    name: "",
-    registry: "",
-    chip: "",
-    brand: "",
-    sex: "Fêmea",
-    category: "potra",
-    birthDate: "",
-    coatColor: "",
-    status: "ativo",
-    managementStatus: "",
-    location: "",
-    serviceType: "",
-    criador: "",
-    proprietario: "",
-    originHaras: "",
-    heightCm: "",
-    weightKg: "",
-    fatherId: "",
-    fatherName: "",
-    fatherSearch: "",
-    motherId: "",
-    motherName: "",
-    motherSearch: "",
-    observations: "",
-  };
-}
-
-function buildEditState(animal: Animal): FormState {
+function buildInitialState(animal: Animal): FormState {
   return {
     name: animal.name ?? "",
     registry: animal.registry_number ?? "",
@@ -158,26 +120,11 @@ function buildEditState(animal: Animal): FormState {
   };
 }
 
-export function AnimalFormModal({
-  visible,
-  onClose,
-  mode,
-  harasId,
-  animal,
-  onCreated,
-}: AnimalFormModalProps) {
+export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalProps) {
   const { theme } = useAppTheme();
-  const isEdit = mode === "edit" && !!animal;
+  const updateMutation = useUpdateAnimalMutation(animal.id, animal.haras_id);
 
-  const updateMutation = useUpdateAnimalMutation(
-    isEdit ? animal!.id : "",
-    isEdit ? animal!.haras_id : harasId
-  );
-  const createMutation = useCreateAnimalMutation();
-
-  const [form, setForm] = useState<FormState>(() =>
-    isEdit ? buildEditState(animal!) : buildCreateState()
-  );
+  const [form, setForm] = useState<FormState>(() => buildInitialState(animal));
   const [error, setError] = useState<string | null>(null);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -185,7 +132,6 @@ export function AnimalFormModal({
   };
 
   const canSubmit = useMemo(() => form.name.trim().length > 0, [form.name]);
-  const isSaving = isEdit ? updateMutation.isPending : createMutation.isPending;
 
   const handleSubmit = async () => {
     setError(null);
@@ -205,70 +151,38 @@ export function AnimalFormModal({
       return;
     }
 
+    const input: UpdateAnimalInput = {
+      name: form.name.trim(),
+      registry_number: normalizeString(form.registry),
+      chip_number: normalizeString(form.chip),
+      brand: normalizeString(form.brand),
+      sex: form.sex,
+      category: form.category,
+      birth_date: normalizeString(form.birthDate),
+      coat_color: normalizeString(form.coatColor),
+      status: form.status,
+      management_status: normalizeString(form.managementStatus),
+      location: normalizeString(form.location),
+      service_type: normalizeString(form.serviceType),
+      criador: normalizeString(form.criador),
+      proprietario: normalizeString(form.proprietario),
+      origin_haras: normalizeString(form.originHaras),
+      height: heightValue,
+      weight: weightValue,
+      father_id: normalizeString(form.fatherId),
+      father_name: normalizeString(form.fatherName),
+      mother_id: normalizeString(form.motherId),
+      mother_name: normalizeString(form.motherName),
+      observations: normalizeString(form.observations),
+    };
+
     try {
-      if (isEdit) {
-        const input: UpdateAnimalInput = {
-          name: form.name.trim(),
-          registry_number: normalizeString(form.registry),
-          chip_number: normalizeString(form.chip),
-          brand: normalizeString(form.brand),
-          sex: form.sex,
-          category: form.category,
-          birth_date: normalizeString(form.birthDate),
-          coat_color: normalizeString(form.coatColor),
-          status: form.status,
-          management_status: normalizeString(form.managementStatus),
-          location: normalizeString(form.location),
-          service_type: normalizeString(form.serviceType),
-          criador: normalizeString(form.criador),
-          proprietario: normalizeString(form.proprietario),
-          origin_haras: normalizeString(form.originHaras),
-          height: heightValue,
-          weight: weightValue,
-          father_id: normalizeString(form.fatherId),
-          father_name: normalizeString(form.fatherName),
-          mother_id: normalizeString(form.motherId),
-          mother_name: normalizeString(form.motherName),
-          observations: normalizeString(form.observations),
-        };
-        await updateMutation.mutateAsync(input);
-      } else {
-        const input: CreateAnimalInput = {
-          haras_id: harasId,
-          name: form.name.trim(),
-          registry_number: normalizeString(form.registry),
-          chip_number: normalizeString(form.chip),
-          brand: normalizeString(form.brand),
-          sex: form.sex,
-          category: form.category,
-          birth_date: normalizeString(form.birthDate),
-          coat_color: normalizeString(form.coatColor),
-          status: form.status,
-          management_status: normalizeString(form.managementStatus),
-          location: normalizeString(form.location),
-          service_type: normalizeString(form.serviceType),
-          criador: normalizeString(form.criador),
-          proprietario: normalizeString(form.proprietario),
-          origin_haras: normalizeString(form.originHaras),
-          height: heightValue,
-          weight: weightValue,
-          father_id: normalizeString(form.fatherId),
-          father_name: normalizeString(form.fatherName),
-          mother_id: normalizeString(form.motherId),
-          mother_name: normalizeString(form.motherName),
-          observations: normalizeString(form.observations),
-        };
-        const created = await createMutation.mutateAsync(input);
-        onCreated?.(created);
-      }
+      await updateMutation.mutateAsync(input);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao salvar.");
+      setError(err instanceof Error ? err.message : "Falha ao salvar alterações.");
     }
   };
-
-  const title = isEdit ? "Editar animal" : "Cadastrar animal";
-  const submitLabel = isEdit ? "Salvar" : "Cadastrar";
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -284,7 +198,7 @@ export function AnimalFormModal({
           ]}
         >
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
+            <Text style={[styles.title, { color: theme.colors.text }]}>Editar animal</Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <X size={22} color={theme.colors.text} />
             </Pressable>
@@ -511,7 +425,7 @@ export function AnimalFormModal({
                 setField("fatherName", selected.name);
                 setField("fatherSearch", selected.name);
               }}
-              harasId={harasId}
+              harasId={animal.haras_id}
               selectedId={form.fatherId}
               selectedLabelPrefix="Pai selecionado"
               onClearSelected={() => {
@@ -539,7 +453,7 @@ export function AnimalFormModal({
                 setField("motherName", selected.name);
                 setField("motherSearch", selected.name);
               }}
-              harasId={harasId}
+              harasId={animal.haras_id}
               selectedId={form.motherId}
               selectedLabelPrefix="Mãe selecionada"
               onClearSelected={() => {
@@ -591,10 +505,10 @@ export function AnimalFormModal({
             </View>
             <View style={styles.footerButton}>
               <AppButton
-                label={isSaving ? "Salvando..." : submitLabel}
+                label={updateMutation.isPending ? "Salvando..." : "Salvar"}
                 onPress={handleSubmit}
-                loading={isSaving}
-                disabled={isSaving || !canSubmit}
+                loading={updateMutation.isPending}
+                disabled={updateMutation.isPending || !canSubmit}
               />
             </View>
           </View>
