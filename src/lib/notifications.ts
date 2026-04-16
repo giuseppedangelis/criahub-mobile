@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 
 const ANDROID_CHANNEL_ID = "criahub-reminders";
 const SCHEDULED_MAP_KEY = "@criahub/notifications/scheduled-v1";
+export const NOTIFICATIONS_OWNER_KEY = "@criahub:notifications/owner-user-id-v1";
 
 let handlerRegistered = false;
 let channelRegistered = false;
@@ -167,4 +168,30 @@ export async function clearAllReminders() {
     }
   }
   await writeScheduledMap({});
+}
+
+export async function readOwnerUserId(): Promise<string | null> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIFICATIONS_OWNER_KEY);
+    if (!raw) return null;
+    return typeof raw === "string" && raw.length > 0 ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeOwnerUserId(userId: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(NOTIFICATIONS_OWNER_KEY, userId);
+  } catch {
+    // silencioso: storage indisponível não pode travar fluxo de auth
+  }
+}
+
+export async function clearOwnerUserId(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(NOTIFICATIONS_OWNER_KEY);
+  } catch {
+    // silencioso
+  }
 }
