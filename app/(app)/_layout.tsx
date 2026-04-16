@@ -1,4 +1,5 @@
 import { Redirect, Stack, useSegments } from "expo-router";
+import { TerminationReminderMount } from "@/src/components/ownership/TerminationReminderMount";
 import { LoadingState } from "@/src/components/ui/LoadingState";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { getDefaultAppRouteForRole, isMobileSupportedRole } from "@/src/lib/roles";
@@ -26,15 +27,20 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="campo/pendencias" options={{ headerShown: true, title: "Minhas Pendências" }} />
-      <Stack.Screen name="campo/gestacoes" options={{ headerShown: true, title: "Gestações" }} />
-      <Stack.Screen name="campo/tarefas" options={{ headerShown: true, title: "Minhas Tarefas" }} />
-      <Stack.Screen name="campo/avisos" options={{ headerShown: true, title: "Avisos de Retorno" }} />
-      <Stack.Screen name="animal/[id]" options={{ headerShown: true, title: "Animal" }} />
-      <Stack.Screen name="vet-prontuario/[id]" options={{ headerShown: true, title: "Prontuário" }} />
-      <Stack.Screen name="unsupported" />
-    </Stack>
+    <>
+      <TerminationReminderMount />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="campo/pendencias" options={{ headerShown: true, title: "Minhas Pendências" }} />
+        <Stack.Screen name="campo/gestacoes" options={{ headerShown: true, title: "Gestações" }} />
+        <Stack.Screen name="campo/tarefas" options={{ headerShown: true, title: "Minhas Tarefas" }} />
+        <Stack.Screen name="campo/avisos" options={{ headerShown: true, title: "Avisos de Retorno" }} />
+        <Stack.Screen name="animal/[id]" options={{ headerShown: true, title: "Animal" }} />
+        <Stack.Screen name="vet-prontuario/[id]" options={{ headerShown: true, title: "Prontuário" }} />
+        <Stack.Screen name="financeiro" options={{ headerShown: true, title: "Financeiro" }} />
+        <Stack.Screen name="equipe" options={{ headerShown: true, title: "Equipe" }} />
+        <Stack.Screen name="unsupported" />
+      </Stack>
+    </>
   );
 }

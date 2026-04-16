@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react-native";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus } from "lucide-react-native";
+import { AnimalFormModal } from "@/src/components/animal/AnimalFormModal";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
@@ -175,9 +176,11 @@ function SummaryCard({ label, value, highlight = false }: { label: string; value
 
 export function PlantelScreen() {
   const router = useRouter();
-  const { harasId } = useAuth();
+  const { harasId, role } = useAuth();
   const { theme } = useAppTheme();
+  const canCreate = role === "criador" || role === "breeder";
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [debouncedSearchText, setDebouncedSearchText] = useState("");
   const [sexFilter, setSexFilter] = useState<SexFilter>("all");
@@ -516,6 +519,36 @@ export function PlantelScreen() {
           <ChevronRight size={18} color={theme.colors.text} />
         </Pressable>
       </View>
+
+      {canCreate ? (
+        <Pressable
+          onPress={() => setIsCreateOpen(true)}
+          accessibilityLabel="Cadastrar animal"
+          style={({ pressed }) => [
+            styles.fab,
+            {
+              backgroundColor: theme.colors.primary,
+              opacity: pressed ? 0.85 : 1,
+              shadowColor: theme.colors.text,
+            },
+          ]}
+        >
+          <Plus size={22} color={theme.colors.primaryText} />
+        </Pressable>
+      ) : null}
+
+      {canCreate && isCreateOpen && harasId ? (
+        <AnimalFormModal
+          visible={isCreateOpen}
+          onClose={() => setIsCreateOpen(false)}
+          mode="create"
+          harasId={harasId}
+          onCreated={(created) => {
+            setIsCreateOpen(false);
+            router.push(`/(app)/animal/${created.id}` as any);
+          }}
+        />
+      ) : null}
     </AppScreen>
   );
 }
@@ -523,6 +556,20 @@ export function PlantelScreen() {
 const styles = StyleSheet.create({
   screen: {
     paddingHorizontal: 0,
+  },
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 96,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
   },
   listContainer: {
     paddingHorizontal: 16,

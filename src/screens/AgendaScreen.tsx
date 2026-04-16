@@ -7,6 +7,7 @@ import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
 import { DateField } from "@/src/components/ui/DateField";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { ScheduleSegmented } from "@/src/components/ui/ScheduleSegmented";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAgendaQuery, useCreateAgendaEventMutation, useUpdateAgendaStatusMutation } from "@/src/hooks/useAgenda";
@@ -143,10 +144,12 @@ export function AgendaScreen() {
       <View style={styles.header}>
         <BrandLogo compact />
         <Text style={[styles.title, { color: theme.colors.text }]}>Agenda</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}> 
+        <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
           Calendário do criador com foco no plantel e reprodução.
         </Text>
       </View>
+
+      {isCreatorRole(role) ? <ScheduleSegmented active="agenda" /> : null}
 
       <Card>
         <View style={styles.row}>

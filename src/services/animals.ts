@@ -11,8 +11,10 @@ import type {
   AnimalFilters,
   AnimalRelative,
   AnimalStatus,
+  CreateAnimalInput,
   PaginatedResponse,
   PaginationParams,
+  UpdateAnimalInput,
 } from "@/src/types/domain";
 
 const CATEGORY_MAPPING: Record<AnimalCategory, string> = {
@@ -72,7 +74,8 @@ const ANIMAL_SELECT_FIELDS = `
   status, status_manejo, pai_id, mae_id, localizacao,
   haras_origem, tipo_servico, criador, proprietario,
   foto_url, images, documents, observacoes,
-  father_name, mother_name,
+  father_name, mother_name, height, weight,
+  is_at_haras, presence_manual_override,
   created_at, updated_at
 `;
 
@@ -108,6 +111,10 @@ function mapAnimalFromDb(row: Record<string, any>): Animal {
     main_image_url: mainImage,
     images: images.length > 0 ? images : mainImage ? [mainImage] : [],
     documents: Array.isArray(row.documents) ? row.documents : [],
+    height: row.height != null ? Number(row.height) : null,
+    weight: row.weight != null ? Number(row.weight) : null,
+    is_at_haras: row.is_at_haras ?? true,
+    presence_manual_override: row.presence_manual_override ?? false,
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
     genealogy: {
@@ -254,5 +261,112 @@ export const animalsService = {
         mother,
       },
     };
+  },
+
+  async create(input: CreateAnimalInput): Promise<Animal> {
+    if (!input.haras_id) throw new Error("Haras não identificado.");
+    if (!input.name?.trim()) throw new Error("Informe o nome do animal.");
+
+    const payload: Record<string, unknown> = {
+      haras_id: input.haras_id,
+      nome: input.name.trim(),
+      registro: input.registry_number?.trim() || null,
+      chip: input.chip_number?.trim() || null,
+      marca: input.brand?.trim() || null,
+      sexo: input.sex,
+      categoria: CATEGORY_MAPPING[input.category] ?? input.category,
+      pelagem: input.coat_color?.trim() || null,
+      data_nascimento: input.birth_date || null,
+      status: STATUS_MAPPING_APP_TO_DB[input.status ?? "ativo"] ?? "Ativo",
+      status_manejo: input.management_status?.trim() || null,
+      localizacao: input.location?.trim() || null,
+      tipo_servico: input.service_type?.trim() || null,
+      pai_id: input.father_id || null,
+      mae_id: input.mother_id || null,
+      father_name: input.father_name?.trim() || null,
+      mother_name: input.mother_name?.trim() || null,
+      criador: input.criador?.trim() || null,
+      proprietario: input.proprietario?.trim() || null,
+      haras_origem: input.origin_haras?.trim() || null,
+      height: input.height ?? null,
+      weight: input.weight ?? null,
+      observacoes: input.observations?.trim() || null,
+      images: [],
+      documents: [],
+      is_at_haras: true,
+      presence_manual_override: false,
+      ingestion_source: "manual",
+    };
+
+    const { data, error } = await supabase
+      .from("animals")
+      .insert(payload)
+      .select(ANIMAL_SELECT_FIELDS)
+      .single();
+
+    if (error) handleSupabaseError(error);
+    return mapAnimalFromDb(data);
+  },
+
+  async update(id: string, harasId: string, input: UpdateAnimalInput): Promise<void> {
+    if (!id || !harasId) {
+      throw new Error("Animal ou haras inválido para atualizar.");
+    }
+
+    const payload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.name !== undefined) payload.nome = input.name;
+    if (input.registry_number !== undefined) payload.registro = input.registry_number || null;
+    if (input.chip_number !== undefined) payload.chip = input.chip_number || null;
+    if (input.brand !== undefined) payload.marca = input.brand || null;
+    if (input.sex !== undefined) payload.sexo = input.sex;
+    if (input.category !== undefined) {
+      payload.categoria = CATEGORY_MAPPING[input.category] ?? input.category;
+    }
+    if (input.birth_date !== undefined) payload.data_nascimento = input.birth_date || null;
+    if (input.coat_color !== undefined) payload.pelagem = input.coat_color || null;
+    if (input.status !== undefined) {
+      payload.status = STATUS_MAPPING_APP_TO_DB[input.status] ?? input.status;
+    }
+    if (input.management_status !== undefined) payload.status_manejo = input.management_status || null;
+    if (input.location !== undefined) payload.localizacao = input.location || null;
+    if (input.service_type !== undefined) payload.tipo_servico = input.service_type || null;
+    if (input.father_id !== undefined) payload.pai_id = input.father_id || null;
+    if (input.mother_id !== undefined) payload.mae_id = input.mother_id || null;
+    if (input.father_name !== undefined) payload.father_name = input.father_name || null;
+    if (input.mother_name !== undefined) payload.mother_name = input.mother_name || null;
+    if (input.criador !== undefined) payload.criador = input.criador || null;
+    if (input.proprietario !== undefined) payload.proprietario = input.proprietario || null;
+    if (input.origin_haras !== undefined) payload.haras_origem = input.origin_haras || null;
+    if (input.height !== undefined) payload.height = input.height;
+    if (input.weight !== undefined) payload.weight = input.weight;
+    if (input.observations !== undefined) payload.observacoes = input.observations || null;
+
+    const { error } = await supabase
+      .from("animals")
+      .update(payload)
+      .eq("id", id)
+      .eq("haras_id", harasId);
+
+    if (error) handleSupabaseError(error);
+  },
+
+  async setPresence(animalId: string, harasId: string, isAtHaras: boolean): Promise<void> {
+    if (!animalId || !harasId) {
+      throw new Error("Animal ou haras inválido para atualizar presença.");
+    }
+    const { error } = await supabase
+      .from("animals")
+      .update({
+        is_at_haras: isAtHaras,
+        presence_manual_override: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", animalId)
+      .eq("haras_id", harasId);
+
+    if (error) handleSupabaseError(error);
   },
 };

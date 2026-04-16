@@ -7,6 +7,8 @@ import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
 import { DateField } from "@/src/components/ui/DateField";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { OptionSearchSelect } from "@/src/components/ui/OptionSearchSelect";
+import { ScheduleSegmented } from "@/src/components/ui/ScheduleSegmented";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useAssignableMembersQuery, useCreateTaskMutation, useTasksQuery, useUpdateTaskMutation } from "@/src/hooks/useTasks";
@@ -67,7 +69,11 @@ export function CreatorRoutineScreen() {
 
   const members = useMemo(() => {
     const list = membersQuery.data ?? [];
-    return [{ id: "", label: "Sem responsável" }, ...list.map((item) => ({ id: item.id, label: item.full_name || item.email || item.role }))];
+    return list.map((item) => ({
+      id: item.id,
+      label: item.full_name || item.email || item.role,
+      description: item.email && item.full_name ? item.email : item.role,
+    }));
   }, [membersQuery.data]);
 
   const resetForm = () => {
@@ -164,9 +170,11 @@ export function CreatorRoutineScreen() {
     <AppScreen scroll>
       <View style={styles.header}>
         <BrandLogo compact />
-        <Text style={[styles.title, { color: theme.colors.text }]}>Rotina</Text>
+        <Text style={[styles.title, { color: theme.colors.text }]}>Tarefas</Text>
         <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>Gestão de tarefas do haras no mobile.</Text>
       </View>
+
+      <ScheduleSegmented active="tarefas" />
 
       <Card>
         <AppButton label="Nova tarefa" onPress={openCreate} />
@@ -352,16 +360,18 @@ export function CreatorRoutineScreen() {
               }}
             />
 
-            <Text style={[styles.inputLabel, { color: theme.colors.text }]}>Responsável</Text>
-            <View style={[styles.selectWrap, { borderColor: theme.colors.border }]}>
-              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator contentContainerStyle={styles.selectContent}>
-                {members.map((member) => (
-                  <Pressable key={member.id || "none"} onPress={() => setResponsibleId(member.id)} style={[styles.selectItem, { borderColor: responsibleId === member.id ? theme.colors.primary : theme.colors.border }]}> 
-                    <Text style={{ color: theme.colors.text }}>{member.label}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
+            <OptionSearchSelect
+              label="Responsável"
+              options={members}
+              value={responsibleId}
+              onChange={setResponsibleId}
+              placeholder="Buscar por nome ou email"
+              emptyText="Nenhum membro encontrado."
+              maxHeight={160}
+            />
+            <Text style={[styles.helperLine, { color: theme.colors.textMuted }]}>
+              Deixe em branco para tarefa sem responsável.
+            </Text>
 
             <TextField label="Observações" value={observations} onChangeText={setObservations} multiline style={styles.textArea} />
 
@@ -438,19 +448,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     justifyContent: "center",
   },
-  selectWrap: {
-    maxHeight: 180,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 6,
-  },
-  selectContent: { gap: 6 },
-  selectItem: {
-    borderWidth: 1,
-    borderRadius: 10,
-    minHeight: 36,
-    justifyContent: "center",
-    paddingHorizontal: 10,
+  helperLine: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   textArea: { minHeight: 90 },
   modalActions: { gap: 8, marginTop: 6 },

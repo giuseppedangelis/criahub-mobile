@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Heart,
   Home,
+  LayoutDashboard,
   List,
   Search,
   Stethoscope,
@@ -103,6 +104,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="campo-gestacoes" options={{ href: null }} />
         <Tabs.Screen name="campo-tarefas" options={{ href: null }} />
         <Tabs.Screen name="campo-avisos" options={{ href: null }} />
+        <Tabs.Screen name="avisos" options={{ href: null }} />
+        <Tabs.Screen name="inicio" options={{ href: null }} />
         <Tabs.Screen name="buscar-animal" options={{ href: null }} />
       </Tabs>
     );
@@ -158,6 +161,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="reproducao" options={{ href: null }} />
         <Tabs.Screen name="veterinaria" options={{ href: null }} />
         <Tabs.Screen name="rotina" options={{ href: null }} />
+        <Tabs.Screen name="avisos" options={{ href: null }} />
+        <Tabs.Screen name="inicio" options={{ href: null }} />
         <Tabs.Screen name="buscar-animal" options={{ href: null }} />
       </Tabs>
     );
@@ -165,6 +170,14 @@ export default function TabsLayout() {
 
   return (
     <Tabs screenOptions={commonScreenOptions}>
+      <Tabs.Screen
+        name="inicio"
+        options={{
+          title: "Início",
+          href: isCreator ? undefined : null,
+          tabBarIcon: ({ color, size }) => <LayoutDashboard color={color} size={size} />,
+        }}
+      />
       <Tabs.Screen
         name="plantel"
         options={{
@@ -183,8 +196,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="rotina"
         options={{
-          title: "Rotina",
-          href: isCreator ? undefined : null,
+          href: null,
           tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} />,
         }}
       />
@@ -194,6 +206,13 @@ export default function TabsLayout() {
           title: "Reprodução",
           href: isCreator ? undefined : null,
           tabBarIcon: ({ color, size }) => <Heart color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="avisos"
+        options={{
+          href: null,
+          tabBarIcon: ({ color, size }) => <BellRing color={color} size={size} />,
         }}
       />
       <Tabs.Screen

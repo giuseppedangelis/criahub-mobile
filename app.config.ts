@@ -22,6 +22,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.criahub.mobile",
+    buildNumber: "1",
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+      NSCameraUsageDescription:
+        "O CriaHub usa a câmera para registrar fotos de animais, documentos e foto de perfil.",
+      NSPhotoLibraryUsageDescription:
+        "O CriaHub acessa sua galeria para anexar fotos de animais, documentos e foto de perfil.",
+      NSPhotoLibraryAddUsageDescription:
+        "O CriaHub pode salvar imagens e comprovantes compartilhados na galeria.",
+      NSMicrophoneUsageDescription:
+        "O CriaHub usa o microfone para registrar áudios de ocorrências em campo.",
+      NSLocationWhenInUseUsageDescription:
+        "O CriaHub usa sua localização para registrar onde nascimentos e ocorrências acontecem.",
+    },
   },
   android: {
     adaptiveIcon: {
@@ -32,13 +46,60 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     predictiveBackGestureEnabled: false,
     softwareKeyboardLayoutMode: "resize",
     package: "com.criahub.mobile",
+    versionCode: 1,
+    permissions: [
+      "android.permission.CAMERA",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.RECORD_AUDIO",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+    ],
   },
   web: {
     bundler: "metro",
     output: "static",
     favicon: "./assets/images/favicon-criahub.png",
   },
-  plugins: ["expo-router", "expo-video", "@react-native-community/datetimepicker"],
+  plugins: [
+    "expo-router",
+    "expo-video",
+    "@react-native-community/datetimepicker",
+    [
+      "expo-notifications",
+      {
+        icon: "./assets/images/icon-criahub.png",
+        color: "#0d0d0d",
+      },
+    ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "O CriaHub acessa sua galeria para anexar fotos de animais, documentos e foto de perfil.",
+        cameraPermission:
+          "O CriaHub usa a câmera para registrar fotos de animais, documentos e foto de perfil.",
+        microphonePermission:
+          "O CriaHub usa o microfone para registrar áudios de ocorrências em campo.",
+      },
+    ],
+    [
+      "expo-location",
+      {
+        locationAlwaysAndWhenInUsePermission:
+          "O CriaHub usa sua localização para registrar onde nascimentos e ocorrências acontecem.",
+      },
+    ],
+    [
+      "expo-document-picker",
+      {
+        iCloudContainerEnvironment: "Production",
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },

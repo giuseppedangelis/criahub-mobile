@@ -23,6 +23,7 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -155,6 +156,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     if (error) throw new Error(error.message);
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    if (!user?.id) return;
+    await loadProfile(user.id);
+  }, [loadProfile, user?.id]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -166,8 +172,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signIn,
       signOut,
       resetPassword,
+      refreshProfile,
     }),
-    [harasId, isLoading, profile, resetPassword, role, session, signIn, signOut, user]
+    [
+      harasId,
+      isLoading,
+      profile,
+      refreshProfile,
+      resetPassword,
+      role,
+      session,
+      signIn,
+      signOut,
+      user,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -13,11 +13,26 @@ import {
   View,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { Pencil } from "lucide-react-native";
+import { AnimalFormModal } from "@/src/components/animal/AnimalFormModal";
+import {
+  AddDocumentButton,
+  AddPhotoButton,
+  AddVideoLinkButton,
+  RemoveMediaButton,
+  useDocumentRemover,
+  usePhotoRemover,
+  useVideoRemover,
+} from "@/src/components/animal/AnimalMediaActions";
+import { AppButton } from "@/src/components/ui/AppButton";
 import { AppScreen } from "@/src/components/ui/AppScreen";
 import { Card } from "@/src/components/ui/Card";
 import { EmptyState } from "@/src/components/ui/EmptyState";
 import { LoadingState } from "@/src/components/ui/LoadingState";
 import { StatusBadge } from "@/src/components/ui/StatusBadge";
+import { OwnershipSection } from "@/src/components/ownership/OwnershipSection";
+import { useAuth } from "@/src/contexts/AuthContext";
+import { isCreatorRole } from "@/src/lib/roles";
 import { useAnimalDetailsQuery } from "@/src/hooks/useAnimalDetails";
 import { useAnimalQuery } from "@/src/hooks/useAnimals";
 import { useAppTheme } from "@/src/theme/ThemeContext";
@@ -119,6 +134,8 @@ function MetaBadge({ label }: { label: string }) {
 
 export function AnimalDetailScreen() {
   const { theme } = useAppTheme();
+  const { role } = useAuth();
+  const canEdit = isCreatorRole(role);
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const modalViewportWidth = Math.min(screenWidth - 32, 460);
   const modalViewportHeight = Math.min(Math.max(screenHeight * 0.68, 300), 520);
@@ -130,8 +147,12 @@ export function AnimalDetailScreen() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const { data: animal, isLoading, error } = useAnimalQuery(animalId, Boolean(animalId));
+  const photoRemover = usePhotoRemover(animal?.id ?? "", animal?.haras_id ?? "");
+  const videoRemover = useVideoRemover(animal?.id ?? "", animal?.haras_id ?? "");
+  const documentRemover = useDocumentRemover(animal?.id ?? "", animal?.haras_id ?? "");
   const {
     data: extra,
     isLoading: isExtraLoading,
@@ -256,7 +277,7 @@ export function AnimalDetailScreen() {
             </View>
             <StatusBadge status={animal.status} />
           </View>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}> 
+          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
             Ficha completa do animal, alinhada ao conteúdo da versão web.
           </Text>
           <View style={styles.badgesRow}>
@@ -265,6 +286,14 @@ export function AnimalDetailScreen() {
             <MetaBadge label={animal.location || "Sem localização"} />
             {isCondominio ? <MetaBadge label="Condomínio" /> : null}
           </View>
+          {canEdit ? (
+            <AppButton
+              label="Editar ficha"
+              variant="ghost"
+              icon={Pencil}
+              onPress={() => setIsEditOpen(true)}
+            />
+          ) : null}
         </Card>
 
         <Card>
@@ -417,6 +446,9 @@ export function AnimalDetailScreen() {
         {activeTab === "videos" ? (
           <Card>
             <SectionTitle title="Galeria de Vídeos" />
+            {canEdit ? (
+              <AddVideoLinkButton animalId={animal.id} harasId={animal.haras_id} />
+            ) : null}
             {extra?.videos.length ? (
               <>
                 {selectedVideo ? (
@@ -508,6 +540,14 @@ export function AnimalDetailScreen() {
                     >
                       <Text style={[styles.itemLink, { color: theme.colors.primary }]}>Abrir vídeo</Text>
                     </Pressable>
+                    {canEdit ? (
+                      <View style={styles.rowActions}>
+                        <RemoveMediaButton
+                          disabled={videoRemover.isPending}
+                          onConfirm={() => videoRemover.remove(video.id)}
+                        />
+                      </View>
+                    ) : null}
                   </View>
                 </View>
                 ))}
@@ -521,6 +561,9 @@ export function AnimalDetailScreen() {
         {activeTab === "photos" ? (
           <Card>
             <SectionTitle title="Galeria de Fotos" />
+            {canEdit ? (
+              <AddPhotoButton animalId={animal.id} harasId={animal.haras_id} />
+            ) : null}
             {photoUrls.length > 0 ? (
               <>
                 <ScrollView
@@ -529,28 +572,39 @@ export function AnimalDetailScreen() {
                   contentContainerStyle={styles.photosRow}
                 >
                   {photoUrls.map((url, index) => (
-                    <Pressable
-                      key={`${url}-${index}`}
-                      onPress={() => onOpenPhoto(index)}
-                      style={({ pressed }) => [
-                        styles.photoCardLarge,
-                        {
-                          borderColor:
-                            index === activePhotoIndex ? theme.colors.primary : theme.colors.border,
-                          opacity: pressed ? 0.85 : 1,
-                        },
-                      ]}
-                    >
-                      <Image source={{ uri: url }} style={styles.photoImage} resizeMode="cover" />
-                    </Pressable>
+                    <View key={`${url}-${index}`} style={styles.photoCell}>
+                      <Pressable
+                        onPress={() => onOpenPhoto(index)}
+                        style={({ pressed }) => [
+                          styles.photoCardLarge,
+                          {
+                            borderColor:
+                              index === activePhotoIndex
+                                ? theme.colors.primary
+                                : theme.colors.border,
+                            opacity: pressed ? 0.85 : 1,
+                          },
+                        ]}
+                      >
+                        <Image source={{ uri: url }} style={styles.photoImage} resizeMode="cover" />
+                      </Pressable>
+                      {canEdit ? (
+                        <RemoveMediaButton
+                          disabled={photoRemover.isPending}
+                          onConfirm={() => photoRemover.remove(url)}
+                        />
+                      ) : null}
+                    </View>
                   ))}
                 </ScrollView>
-                <Text style={[styles.photoCounter, { color: theme.colors.textMuted }]}> 
+                <Text style={[styles.photoCounter, { color: theme.colors.textMuted }]}>
                   Foto {activePhotoIndex + 1} de {photoUrls.length}
                 </Text>
               </>
             ) : (
-              <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>Nenhuma foto cadastrada.</Text>
+              <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>
+                Nenhuma foto cadastrada.
+              </Text>
             )}
           </Card>
         ) : null}
@@ -586,31 +640,46 @@ export function AnimalDetailScreen() {
         ) : null}
 
         {activeTab === "location" ? (
-          <Card>
-            <SectionTitle title="Localização" />
-            <DetailRow label="Local atual" value={animal.location || "Não informado"} />
-            {extra?.locations.length ? (
-              extra.locations.slice(0, 25).map((entry) => (
-                <View key={entry.id} style={[styles.listRow, { borderColor: theme.colors.border }]}> 
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemTitle, { color: theme.colors.text }]}> 
-                      {entry.previous_location || "-"} {"->"} {entry.new_location || "-"}
-                    </Text>
-                    <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}> 
-                      {formatDateBR(entry.changed_at)} {entry.service_type ? `• ${entry.service_type}` : ""}
-                    </Text>
-                    {entry.reason || entry.notes ? (
-                      <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>
-                        {entry.reason || entry.notes}
+          <>
+            <OwnershipSection
+              animalId={animal.id}
+              harasId={animal.haras_id}
+              animalBirthDate={animal.birth_date}
+              isAtHaras={animal.is_at_haras}
+              defaultOwnerName={animal.proprietario ?? animal.criador ?? null}
+            />
+            <Card>
+              <SectionTitle title="Histórico de localização" />
+              <DetailRow label="Local atual" value={animal.location || "Não informado"} />
+              {extra?.locations.length ? (
+                extra.locations.slice(0, 25).map((entry) => (
+                  <View
+                    key={entry.id}
+                    style={[styles.listRow, { borderColor: theme.colors.border }]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.itemTitle, { color: theme.colors.text }]}>
+                        {entry.previous_location || "-"} {"->"} {entry.new_location || "-"}
                       </Text>
-                    ) : null}
+                      <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>
+                        {formatDateBR(entry.changed_at)}{" "}
+                        {entry.service_type ? `• ${entry.service_type}` : ""}
+                      </Text>
+                      {entry.reason || entry.notes ? (
+                        <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>
+                          {entry.reason || entry.notes}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              ))
-            ) : (
-              <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>Sem histórico de localização.</Text>
-            )}
-          </Card>
+                ))
+              ) : (
+                <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>
+                  Sem histórico de localização.
+                </Text>
+              )}
+            </Card>
+          </>
         ) : null}
 
         {activeTab === "health" ? (
@@ -667,12 +736,15 @@ export function AnimalDetailScreen() {
         {activeTab === "documents" ? (
           <Card>
             <SectionTitle title="Documentos" />
+            {canEdit ? (
+              <AddDocumentButton animalId={animal.id} harasId={animal.haras_id} />
+            ) : null}
             {extra?.documents.length ? (
               extra.documents.slice(0, 40).map((item) => (
-                <View key={item.id} style={[styles.listRow, { borderColor: theme.colors.border }]}> 
+                <View key={item.id} style={[styles.listRow, { borderColor: theme.colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}> 
+                    <Text style={[styles.itemMeta, { color: theme.colors.textMuted }]}>
                       {item.type} • {formatDateBR(item.created_at)}
                     </Text>
                     <Pressable
@@ -681,13 +753,25 @@ export function AnimalDetailScreen() {
                       }}
                       style={({ pressed }) => [styles.linkButton, { opacity: pressed ? 0.75 : 1 }]}
                     >
-                      <Text style={[styles.itemLink, { color: theme.colors.primary }]}>Abrir documento</Text>
+                      <Text style={[styles.itemLink, { color: theme.colors.primary }]}>
+                        Abrir documento
+                      </Text>
                     </Pressable>
+                    {canEdit ? (
+                      <View style={styles.rowActions}>
+                        <RemoveMediaButton
+                          disabled={documentRemover.isPending}
+                          onConfirm={() => documentRemover.remove(item.id)}
+                        />
+                      </View>
+                    ) : null}
                   </View>
                 </View>
               ))
             ) : (
-              <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>Nenhum documento cadastrado.</Text>
+              <Text style={[styles.emptyLine, { color: theme.colors.textMuted }]}>
+                Nenhum documento cadastrado.
+              </Text>
             )}
           </Card>
         ) : null}
@@ -816,6 +900,16 @@ export function AnimalDetailScreen() {
           </View>
         </Modal>
       </ScrollView>
+
+      {canEdit && isEditOpen ? (
+        <AnimalFormModal
+          visible={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          mode="edit"
+          harasId={animal.haras_id}
+          animal={animal}
+        />
+      ) : null}
     </AppScreen>
   );
 }
@@ -981,6 +1075,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     overflow: "hidden",
+  },
+  photoCell: {
+    gap: 6,
+    marginRight: 10,
+  },
+  rowActions: {
+    marginTop: 6,
+    flexDirection: "row",
   },
   photoImage: {
     width: "100%",

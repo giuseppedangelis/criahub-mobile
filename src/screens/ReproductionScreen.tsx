@@ -5,6 +5,8 @@ import { AppScreen } from "@/src/components/ui/AppScreen";
 import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
 import { EmptyState } from "@/src/components/ui/EmptyState";
+import { EmbryosSection } from "@/src/components/reproduction/EmbryosSection";
+import { SemenInventorySection } from "@/src/components/reproduction/SemenInventorySection";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { useReproductionOverviewQuery } from "@/src/hooks/useReproduction";
 import { isCreatorRole, isVeterinaryRole } from "@/src/lib/roles";
@@ -33,7 +35,7 @@ function getStatusTone(value: string | null | undefined) {
 }
 
 export function ReproductionScreen() {
-  const { role, harasId } = useAuth();
+  const { role, harasId, user } = useAuth();
   const { theme } = useAppTheme();
   const { data, isLoading, error } = useReproductionOverviewQuery(harasId);
   const [selectedEvent, setSelectedEvent] = useState<ReproductionEventItem | null>(null);
@@ -109,6 +111,11 @@ export function ReproductionScreen() {
           </Card>
         ))}
       </View>
+
+      {harasId ? <EmbryosSection harasId={harasId} /> : null}
+      {harasId ? (
+        <SemenInventorySection harasId={harasId} userId={user?.id} />
+      ) : null}
 
       <Card>
         <View style={styles.cardHeader}>

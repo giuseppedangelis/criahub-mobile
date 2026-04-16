@@ -9,7 +9,10 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "build:android:apk": "npx eas-cli build --platform android --profile preview",
-    "build:android:aab": "npx eas-cli build --platform android --profile production"
+    "build:android:aab": "npx eas-cli build --platform android --profile production",
+    "build:ios:simulator": "npx eas-cli build --platform ios --profile preview",
+    "build:ios:release": "npx eas-cli build --platform ios --profile production",
+    "submit:android": "npx eas-cli submit --platform android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -29,6 +32,7 @@
     "expo-image-picker": "~17.0.10",
     "expo-linking": "~8.0.11",
     "expo-location": "~19.0.8",
+    "expo-notifications": "~0.32.16",
     "expo-router": "~6.0.23",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",

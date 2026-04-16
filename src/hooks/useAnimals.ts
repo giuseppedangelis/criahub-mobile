@@ -1,6 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { animalsService } from "@/src/services/animals";
-import type { AnimalFilters, PaginationParams } from "@/src/types/domain";
+import { animalDetailsKeys } from "@/src/hooks/useAnimalDetails";
+import type {
+  AnimalFilters,
+  CreateAnimalInput,
+  PaginationParams,
+  UpdateAnimalInput,
+} from "@/src/types/domain";
 
 export const animalKeys = {
   all: ["animals"] as const,
@@ -28,5 +34,31 @@ export function useAnimalQuery(id: string, enabled = true) {
     queryKey: animalKeys.detail(id),
     queryFn: () => animalsService.getById(id),
     enabled: enabled && Boolean(id),
+  });
+}
+
+export function useCreateAnimalMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAnimalInput) => animalsService.create(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: animalKeys.all });
+    },
+  });
+}
+
+export function useUpdateAnimalMutation(animalId: string, harasId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateAnimalInput) =>
+      animalsService.update(animalId, harasId, input),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: animalKeys.all }),
+        queryClient.invalidateQueries({
+          queryKey: animalDetailsKeys.detail(animalId, harasId),
+        }),
+      ]);
+    },
   });
 }

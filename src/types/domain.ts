@@ -80,9 +80,116 @@ export interface Animal {
   main_image_url: string | null;
   images: string[];
   documents: string[];
+  height: number | null;
+  weight: number | null;
+  is_at_haras: boolean;
+  presence_manual_override: boolean;
   created_at: string | null;
   updated_at: string | null;
   genealogy: AnimalGenealogyBasic;
+}
+
+export type OwnershipTerminationType = "date" | "age";
+
+export interface AnimalOwnershipShare {
+  id: string;
+  animal_id: string;
+  haras_id: string;
+  owner_name: string;
+  percentage: number;
+  is_primary: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  notes: string | null;
+  source: string | null;
+  termination_type: OwnershipTerminationType | null;
+  termination_date: string | null;
+  termination_age_years: number | null;
+  physical_location: string | null;
+  is_external: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface OwnershipShareDraft {
+  id?: string;
+  owner_name: string;
+  percentage: number;
+  is_primary: boolean;
+  start_date?: string | null;
+  termination_type?: OwnershipTerminationType | null;
+  termination_date?: string | null;
+  termination_age_years?: number | null;
+  physical_location?: string | null;
+  is_external?: boolean;
+}
+
+export interface SaveAnimalOwnershipSharesInput {
+  animalId: string;
+  harasId: string;
+  shares: OwnershipShareDraft[];
+}
+
+export interface UpcomingTerminationItem {
+  animal_id: string;
+  animal_name: string;
+  haras_id: string;
+  termination_type: OwnershipTerminationType;
+  due_date: string;
+  days_remaining: number;
+  physical_location: string | null;
+  primary_owner: string | null;
+}
+
+export interface CreateAnimalInput {
+  haras_id: string;
+  name: string;
+  registry_number?: string | null;
+  chip_number?: string | null;
+  brand?: string | null;
+  sex: AnimalSex;
+  category: AnimalCategory;
+  birth_date?: string | null;
+  coat_color?: string | null;
+  status?: AnimalStatus;
+  management_status?: string | null;
+  location?: string | null;
+  service_type?: string | null;
+  father_id?: string | null;
+  mother_id?: string | null;
+  father_name?: string | null;
+  mother_name?: string | null;
+  criador?: string | null;
+  proprietario?: string | null;
+  origin_haras?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  observations?: string | null;
+}
+
+export interface UpdateAnimalInput {
+  name?: string;
+  registry_number?: string | null;
+  chip_number?: string | null;
+  brand?: string | null;
+  sex?: AnimalSex;
+  category?: AnimalCategory;
+  birth_date?: string | null;
+  coat_color?: string | null;
+  status?: AnimalStatus;
+  management_status?: string | null;
+  location?: string | null;
+  service_type?: string | null;
+  father_id?: string | null;
+  mother_id?: string | null;
+  father_name?: string | null;
+  mother_name?: string | null;
+  criador?: string | null;
+  proprietario?: string | null;
+  origin_haras?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  observations?: string | null;
 }
 
 export interface AnimalFilters {

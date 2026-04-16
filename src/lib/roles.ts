@@ -64,7 +64,7 @@ export function isMobileSupportedRole(role?: string | null): boolean {
 export function getDefaultAppRouteForRole(role?: string | null): string {
   if (isFieldStaffRole(role)) return "/(app)/(tabs)/campo";
   if (isVeterinaryRole(role)) return "/(app)/(tabs)/veterinaria";
-  if (isCreatorRole(role)) return "/(app)/(tabs)/plantel";
+  if (isCreatorRole(role)) return "/(app)/(tabs)/inicio";
   return "/(app)/unsupported";
 }
 
