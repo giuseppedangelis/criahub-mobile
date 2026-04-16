@@ -47,7 +47,16 @@ function stableJson(value: unknown): string {
   return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(obj[key])}`).join(",")}}`;
 }
 
-export function buildFieldActionFingerprint(type: FieldOfflineActionType, payload: Record<string, unknown>) {
+function bucketToMinute(isoTimestamp: string): string {
+  // Trunca "2026-04-16T14:23:45.678Z" → "2026-04-16T14:23"
+  return isoTimestamp.slice(0, 16);
+}
+
+export function buildFieldActionFingerprint(
+  type: FieldOfflineActionType,
+  payload: Record<string, unknown>,
+  createdAtIso: string,
+) {
   const normalized = {
     type,
     haras_id: typeof payload.haras_id === "string" ? payload.haras_id : null,
@@ -58,6 +67,7 @@ export function buildFieldActionFingerprint(type: FieldOfflineActionType, payloa
     foal_sex: typeof payload.foal_sex === "string" ? payload.foal_sex : null,
     note: typeof payload.note === "string" ? payload.note.trim() : null,
     photo_uri: typeof payload.photo_uri === "string" ? payload.photo_uri : null,
+    created_at_minute: bucketToMinute(createdAtIso),
   };
   return stableJson(normalized);
 }
@@ -68,7 +78,7 @@ function normalizeQueueItem(item: Partial<FieldOfflineAction> & { id?: string; t
   const payload = item.payload && typeof item.payload === "object" && !Array.isArray(item.payload)
     ? (item.payload as Record<string, unknown>)
     : {};
-  const fingerprint = item.fingerprint || buildFieldActionFingerprint(item.type, payload);
+  const fingerprint = item.fingerprint || buildFieldActionFingerprint(item.type, payload, createdAt);
 
   return {
     id: item.id || createActionId(),
@@ -114,7 +124,8 @@ export async function writeFieldOfflineQueue(items: FieldOfflineAction[]) {
 export async function enqueueFieldOfflineAction(type: FieldOfflineActionType, payload: Record<string, unknown>) {
   const queue = await readFieldOfflineQueue();
   const now = Date.now();
-  const fingerprint = buildFieldActionFingerprint(type, payload);
+  const createdAtIso = new Date(now).toISOString();
+  const fingerprint = buildFieldActionFingerprint(type, payload, createdAtIso);
 
   const duplicated = queue.some((item) => {
     if (item.fingerprint !== fingerprint) return false;
@@ -132,7 +143,7 @@ export async function enqueueFieldOfflineAction(type: FieldOfflineActionType, pa
     type,
     payload,
     fingerprint,
-    created_at: new Date(now).toISOString(),
+    created_at: createdAtIso,
     retry_count: 0,
     last_error: null,
     last_attempt_at: null,
