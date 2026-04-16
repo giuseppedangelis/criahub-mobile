@@ -125,12 +125,13 @@ function mapAnimalFromDb(row: Record<string, any>): Animal {
   };
 }
 
-async function fetchRelative(id: string | null): Promise<AnimalRelative | null> {
+async function fetchRelative(id: string | null, harasId: string): Promise<AnimalRelative | null> {
   if (!id) return null;
 
   const { data, error } = await supabase
     .from("animals")
     .select("id, nome, registro")
+    .eq("haras_id", harasId)
     .eq("id", id)
     .maybeSingle();
 
@@ -247,8 +248,8 @@ export const animalsService = {
     if (!data) return null;
 
     const [father, mother] = await Promise.all([
-      fetchRelative(data.pai_id ?? null),
-      fetchRelative(data.mae_id ?? null),
+      fetchRelative(data.pai_id ?? null, data.haras_id),
+      fetchRelative(data.mae_id ?? null, data.haras_id),
     ]);
 
     const mapped = mapAnimalFromDb(data);
