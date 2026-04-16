@@ -9,6 +9,7 @@ interface DateFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
 function parseIsoDate(value: string) {
@@ -32,13 +33,20 @@ function toPtBrDate(value: string) {
   return `${d}/${m}/${y}`;
 }
 
-export function DateField({ label, value, onChange, placeholder = "DD/MM/AAAA" }: DateFieldProps) {
+export function DateField({
+  label,
+  value,
+  onChange,
+  placeholder = "DD/MM/AAAA",
+  disabled = false,
+}: DateFieldProps) {
   const { theme } = useAppTheme();
   const [iosPickerOpen, setIosPickerOpen] = useState(false);
   const [iosTempDate, setIosTempDate] = useState<Date>(parseIsoDate(value));
   const displayValue = useMemo(() => toPtBrDate(value), [value]);
 
   const openPicker = () => {
+    if (disabled) return;
     const base = parseIsoDate(value);
     if (Platform.OS === "android") {
       DateTimePickerAndroid.open({
@@ -57,16 +65,17 @@ export function DateField({ label, value, onChange, placeholder = "DD/MM/AAAA" }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, disabled && { opacity: 0.6 }]}>
       <Text style={[styles.label, { color: theme.colors.text }]}>{label}</Text>
       <Pressable
         onPress={openPicker}
+        disabled={disabled}
         style={({ pressed }) => [
           styles.input,
           {
             borderColor: theme.colors.border,
-            backgroundColor: theme.colors.inputBackground,
-            opacity: pressed ? 0.85 : 1,
+            backgroundColor: disabled ? theme.colors.surfaceAlt : theme.colors.inputBackground,
+            opacity: disabled ? 1 : pressed ? 0.85 : 1,
           },
         ]}
       >

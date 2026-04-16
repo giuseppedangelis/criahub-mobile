@@ -74,7 +74,7 @@ const ANIMAL_SELECT_FIELDS = `
   haras_origem, tipo_servico, criador, proprietario,
   foto_url, images, documents, observacoes,
   father_name, mother_name, height, weight,
-  is_at_haras, presence_manual_override,
+  is_at_haras, presence_manual_override, abccmm_rowid,
   created_at, updated_at
 `;
 
@@ -114,6 +114,8 @@ function mapAnimalFromDb(row: Record<string, any>): Animal {
     weight: row.weight != null ? Number(row.weight) : null,
     is_at_haras: row.is_at_haras ?? true,
     presence_manual_override: row.presence_manual_override ?? false,
+    abccmm_rowid: row.abccmm_rowid ?? null,
+    is_official: Boolean(row.abccmm_rowid),
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
     genealogy: {

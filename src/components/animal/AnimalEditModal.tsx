@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { X } from "lucide-react-native";
+import { Lock, X } from "lucide-react-native";
 import { AnimalSearchSelect } from "@/src/components/ui/AnimalSearchSelect";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { DateField } from "@/src/components/ui/DateField";
@@ -43,8 +43,6 @@ interface FormState {
   managementStatus: string;
   location: string;
   serviceType: string;
-  criador: string;
-  proprietario: string;
   originHaras: string;
   heightCm: string;
   weightKg: string;
@@ -105,8 +103,6 @@ function buildInitialState(animal: Animal): FormState {
     managementStatus: animal.management_status ?? "",
     location: animal.location ?? "",
     serviceType: animal.service_type ?? "",
-    criador: animal.criador ?? "",
-    proprietario: animal.proprietario ?? "",
     originHaras: animal.origin_haras ?? "",
     heightCm: animal.height != null ? String(animal.height) : "",
     weightKg: animal.weight != null ? String(animal.weight) : "",
@@ -123,6 +119,7 @@ function buildInitialState(animal: Animal): FormState {
 export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalProps) {
   const { theme } = useAppTheme();
   const updateMutation = useUpdateAnimalMutation(animal.id, animal.haras_id);
+  const isOfficial = animal.is_official;
 
   const [form, setForm] = useState<FormState>(() => buildInitialState(animal));
   const [error, setError] = useState<string | null>(null);
@@ -152,20 +149,11 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
     }
 
     const input: UpdateAnimalInput = {
-      name: form.name.trim(),
-      registry_number: normalizeString(form.registry),
-      chip_number: normalizeString(form.chip),
       brand: normalizeString(form.brand),
-      sex: form.sex,
-      category: form.category,
-      birth_date: normalizeString(form.birthDate),
-      coat_color: normalizeString(form.coatColor),
       status: form.status,
       management_status: normalizeString(form.managementStatus),
       location: normalizeString(form.location),
       service_type: normalizeString(form.serviceType),
-      criador: normalizeString(form.criador),
-      proprietario: normalizeString(form.proprietario),
       origin_haras: normalizeString(form.originHaras),
       height: heightValue,
       weight: weightValue,
@@ -175,6 +163,17 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
       mother_name: normalizeString(form.motherName),
       observations: normalizeString(form.observations),
     };
+
+    // Campos oficiais (ABCCMM) só podem ser editados em animais avulsos/manuais.
+    if (!isOfficial) {
+      input.name = form.name.trim();
+      input.registry_number = normalizeString(form.registry);
+      input.chip_number = normalizeString(form.chip);
+      input.sex = form.sex;
+      input.category = form.category;
+      input.birth_date = normalizeString(form.birthDate);
+      input.coat_color = normalizeString(form.coatColor);
+    }
 
     try {
       await updateMutation.mutateAsync(input);
@@ -209,6 +208,24 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {isOfficial ? (
+              <View
+                style={[
+                  styles.officialBanner,
+                  {
+                    backgroundColor: theme.colors.info + "15",
+                    borderColor: theme.colors.info,
+                  },
+                ]}
+              >
+                <Lock size={14} color={theme.colors.info} />
+                <Text style={[styles.officialBannerText, { color: theme.colors.info }]}>
+                  Dados oficiais ABCCMM bloqueados. Apenas manejo, localização e mídias podem ser
+                  editados.
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>
               Identificação
             </Text>
@@ -217,17 +234,20 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
               value={form.name}
               onChangeText={(value) => setField("name", value)}
               placeholder="Nome do animal"
+              disabled={isOfficial}
             />
             <TextField
               label="Registro ABCCMM"
               value={form.registry}
               onChangeText={(value) => setField("registry", value)}
               placeholder="Ex: 0001234"
+              disabled={isOfficial}
             />
             <TextField
               label="Chip / RFID"
               value={form.chip}
               onChangeText={(value) => setField("chip", value)}
+              disabled={isOfficial}
             />
             <TextField
               label="Marca / Ferro"
@@ -240,13 +260,16 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
             </Text>
 
             <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Sexo</Text>
-            <View style={styles.pillRow}>
+            <View style={[styles.pillRow, isOfficial && styles.disabledBlock]}>
               {SEX_OPTIONS.map((option) => {
                 const active = form.sex === option.value;
                 return (
                   <Pressable
                     key={option.value}
-                    onPress={() => setField("sex", option.value)}
+                    onPress={() => {
+                      if (!isOfficial) setField("sex", option.value);
+                    }}
+                    disabled={isOfficial}
                     style={({ pressed }) => [
                       styles.pill,
                       {
@@ -254,7 +277,7 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
                           ? theme.colors.primary
                           : theme.colors.inputBackground,
                         borderColor: active ? theme.colors.primary : theme.colors.border,
-                        opacity: pressed ? 0.8 : 1,
+                        opacity: pressed && !isOfficial ? 0.8 : 1,
                       },
                     ]}
                   >
@@ -273,13 +296,16 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
             </View>
 
             <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Categoria</Text>
-            <View style={styles.pillRow}>
+            <View style={[styles.pillRow, isOfficial && styles.disabledBlock]}>
               {CATEGORY_OPTIONS.map((option) => {
                 const active = form.category === option.value;
                 return (
                   <Pressable
                     key={option.value}
-                    onPress={() => setField("category", option.value)}
+                    onPress={() => {
+                      if (!isOfficial) setField("category", option.value);
+                    }}
+                    disabled={isOfficial}
                     style={({ pressed }) => [
                       styles.pill,
                       {
@@ -287,7 +313,7 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
                           ? theme.colors.primary
                           : theme.colors.inputBackground,
                         borderColor: active ? theme.colors.primary : theme.colors.border,
-                        opacity: pressed ? 0.8 : 1,
+                        opacity: pressed && !isOfficial ? 0.8 : 1,
                       },
                     ]}
                   >
@@ -309,11 +335,13 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
               label="Data de nascimento"
               value={form.birthDate}
               onChange={(value) => setField("birthDate", value)}
+              disabled={isOfficial}
             />
             <TextField
               label="Pelagem"
               value={form.coatColor}
               onChangeText={(value) => setField("coatColor", value)}
+              disabled={isOfficial}
             />
 
             <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Status</Text>
@@ -395,16 +423,10 @@ export function AnimalEditModal({ visible, onClose, animal }: AnimalEditModalPro
             <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>
               Propriedade
             </Text>
-            <TextField
-              label="Criador"
-              value={form.criador}
-              onChangeText={(value) => setField("criador", value)}
-            />
-            <TextField
-              label="Proprietário"
-              value={form.proprietario}
-              onChangeText={(value) => setField("proprietario", value)}
-            />
+            <Text style={[styles.helperLine, { color: theme.colors.textMuted }]}>
+              Criador e proprietário vêm do registro ABCCMM ou do condomínio (cotistas) — edite em
+              "Localização & Propriedade" quando aplicável.
+            </Text>
             <TextField
               label="Haras de origem"
               value={form.originHaras}
@@ -576,6 +598,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
+  },
+  disabledBlock: {
+    opacity: 0.55,
+  },
+  officialBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 4,
+  },
+  officialBannerText: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+    lineHeight: 16,
+  },
+  helperLine: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   twoCol: {
     flexDirection: "row",

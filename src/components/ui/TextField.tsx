@@ -5,20 +5,23 @@ import { useAppTheme } from "@/src/theme/ThemeContext";
 interface TextFieldProps extends TextInputProps {
   label?: string;
   error?: string;
+  disabled?: boolean;
 }
 
 export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
-  { label, error, style, ...props },
+  { label, error, disabled, style, editable, ...props },
   ref
 ) {
   const { theme } = useAppTheme();
   const isMultiline = Boolean(props.multiline);
+  const isEditable = disabled ? false : editable !== false;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, disabled && styles.disabledContainer]}>
       {label ? <Text style={[styles.label, { color: theme.colors.text }]}>{label}</Text> : null}
       <TextInput
         ref={ref}
+        editable={isEditable}
         style={[
           styles.input,
           isMultiline && styles.multilineInput,
@@ -27,6 +30,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
             backgroundColor: theme.colors.inputBackground,
             borderColor: error ? theme.colors.danger : theme.colors.border,
           },
+          disabled && { backgroundColor: theme.colors.surfaceAlt },
           style,
         ]}
         placeholderTextColor={theme.colors.textMuted}
@@ -40,6 +44,9 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
 const styles = StyleSheet.create({
   container: {
     gap: 8,
+  },
+  disabledContainer: {
+    opacity: 0.6,
   },
   label: {
     fontSize: 14,

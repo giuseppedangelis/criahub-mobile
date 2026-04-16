@@ -84,6 +84,8 @@ export interface Animal {
   weight: number | null;
   is_at_haras: boolean;
   presence_manual_override: boolean;
+  abccmm_rowid: string | null;
+  is_official: boolean;
   created_at: string | null;
   updated_at: string | null;
   genealogy: AnimalGenealogyBasic;
