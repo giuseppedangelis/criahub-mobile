@@ -1,6 +1,6 @@
 # STATE — CriaHub Mobile
 
-**Last updated:** 2026-04-16 (phase 1 context gathered)
+**Last updated:** 2026-04-16 (phase 1 planned — 4 plans ready to execute)
 
 ## Project Reference
 
@@ -11,9 +11,9 @@
 
 ## Current Position
 
-**Phase:** 1 — Auth & Notifications Security (context gathered)
-**Plan:** —
-**Status:** Phase 1 context captured; ready for `/gsd-plan-phase 1`
+**Phase:** 1 — Auth & Notifications Security (planned)
+**Plan:** 4 plans em 3 waves (01-01 NOTIF-01, 01-02/03/04 AUTH-01)
+**Status:** Ready to execute — `/gsd-execute-phase 1`
 **Progress:** [░░░░░░░░░░] 0% (0/33 requirements complete)
 
 ### Phase Queue
@@ -50,7 +50,7 @@
 
 ### Open Todos
 
-- [ ] Executar `/gsd-plan-phase 1` usando `.planning/phases/01-auth-notifications-security/01-CONTEXT.md` como input
+- [ ] Executar `/gsd-execute-phase 1` — rodar os 4 PLAN.md em wave order (Wave 1: 01-01 → Wave 2: 01-02 → 01-03 → Wave 3: 01-04)
 
 ### Blockers
 
@@ -64,15 +64,19 @@ _None._
 
 ## Session Continuity
 
-**Last command:** `/gsd-discuss-phase 1`
-**Next expected command:** `/gsd-plan-phase 1`
+**Last command:** `/gsd-plan-phase 1 --auto`
+**Next expected command:** `/gsd-execute-phase 1`
 **Context files ready:**
 - `.planning/PROJECT.md` — context, constraints, decisions
 - `.planning/REQUIREMENTS.md` — 33 REQs com REQ-IDs + traceability preenchida
 - `.planning/ROADMAP.md` — 6 fases + success criteria + dependências
 - `.planning/codebase/CONCERNS.md` — bugs conhecidos com arquivo:linha e fix proposto
 - `.planning/config.json` — granularity=coarse, parallelization=false, workflow flags
-- `.planning/phases/01-auth-notifications-security/01-CONTEXT.md` — 17 decisões (D-01 a D-17) cobrindo deep link strategy, reset password surface, session collision, clearAllReminders scope, edge cases
-- `.planning/phases/01-auth-notifications-security/01-DISCUSSION-LOG.md` — audit trail das 5 áreas discutidas
+- `.planning/phases/01-auth-notifications-security/01-CONTEXT.md` — 17 decisões (D-01 a D-17)
+- `.planning/phases/01-auth-notifications-security/01-DISCUSSION-LOG.md` — audit trail
+- `.planning/phases/01-auth-notifications-security/01-01-PLAN.md` — NOTIF-01 (wave 1, 3 tasks)
+- `.planning/phases/01-auth-notifications-security/01-02-PLAN.md` — AUTH-01.a redirectTo + mensagem ForgotPassword (wave 2, 2 tasks)
+- `.planning/phases/01-auth-notifications-security/01-03-PLAN.md` — AUTH-01.b ResetPasswordScreen + rota (wave 2, 3 tasks)
+- `.planning/phases/01-auth-notifications-security/01-04-PLAN.md` — AUTH-01.c deep link listener com usePathname guard + parse de fragment (wave 3, 2 tasks)
 
-**Resume here:** Phase 1 planning. Context da Fase 1 já capturado. Próximo passo é `/gsd-plan-phase 1` que vai consumir o 01-CONTEXT.md e produzir PLAN.md(s) para AUTH-01 (criar `app/(auth)/reset-password.tsx` + `ResetPasswordScreen.tsx` + listener de deep link em `(auth)/_layout.tsx` + `redirectTo` no `resetPasswordForEmail`) e NOTIF-01 (`clearAllReminders` no signOut + user-mismatch detection via AsyncStorage `@criahub:notifications/owner-user-id-v1` no `onAuthStateChange`).
+**Resume here:** Phase 1 execution. 4 plans validados pelo plan-checker (iteração 2 passou sem blockers). Próximo passo: `/gsd-execute-phase 1 --auto`. Plans seguem wave order e têm checkpoints human-verify nos pontos críticos (NOTIF-01 validação, ResetPassword visual, deep link end-to-end em EAS build). Execução autônoma via gsd-executor com commits atômicos por task.
