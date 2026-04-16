@@ -1,10 +1,12 @@
 import NetInfo from "@react-native-community/netinfo";
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import {
+  clearDeadFieldActions,
   enqueueFieldOfflineAction,
   type FieldOfflineAction,
   getFieldSyncSnapshot,
   isNetworkLikeError,
+  MAX_RETRIES,
   readFieldOfflineQueue,
   writeFieldLastSync,
   writeFieldOfflineQueue,
@@ -38,12 +40,14 @@ function buildRetryAtIso(retryCount: number) {
 function toQueueFailureItem(item: FieldOfflineAction, error: unknown): FieldOfflineAction {
   const message = error instanceof Error ? error.message : "Erro ao sincronizar ação offline.";
   const retryCount = (item.retry_count ?? 0) + 1;
+  const isDead = retryCount >= MAX_RETRIES;
   return {
     ...item,
     retry_count: retryCount,
     last_error: message,
     last_attempt_at: new Date().toISOString(),
-    next_retry_at: buildRetryAtIso(retryCount),
+    next_retry_at: isDead ? null : buildRetryAtIso(retryCount),
+    dead: isDead ? true : item.dead,
   };
 }
 
@@ -381,6 +385,10 @@ export const fieldService = {
     let skippedByBackoff = 0;
 
     for (const item of queue) {
+      if (item.dead) {
+        remaining.push(item);
+        continue;
+      }
       if (item.next_retry_at && new Date(item.next_retry_at).getTime() > Date.now()) {
         remaining.push(item);
         skippedByBackoff += 1;

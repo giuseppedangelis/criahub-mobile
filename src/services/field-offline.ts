@@ -4,6 +4,8 @@ const QUEUE_KEY = "@criahub:field-offline-queue";
 const LAST_SYNC_KEY = "@criahub:field-offline-last-sync";
 const DEDUP_WINDOW_MS = 2 * 60 * 1000;
 
+export const MAX_RETRIES = 10;
+
 export type FieldOfflineActionType = "birth_report" | "issue_report";
 
 export interface FieldOfflineAction {
@@ -16,6 +18,7 @@ export interface FieldOfflineAction {
   last_error: string | null;
   last_attempt_at: string | null;
   next_retry_at: string | null;
+  dead?: boolean;
 }
 
 export interface FieldSyncSnapshot {
@@ -25,6 +28,7 @@ export interface FieldSyncSnapshot {
     issue_report: number;
   };
   failed_count: number;
+  dead_count: number;
   max_retry_count: number;
   oldest_pending_at: string | null;
   next_retry_at: string | null;
@@ -90,6 +94,7 @@ function normalizeQueueItem(item: Partial<FieldOfflineAction> & { id?: string; t
     last_error: typeof item.last_error === "string" ? item.last_error : null,
     last_attempt_at: typeof item.last_attempt_at === "string" ? item.last_attempt_at : null,
     next_retry_at: typeof item.next_retry_at === "string" ? item.next_retry_at : null,
+    dead: item.dead === true,
   };
 }
 
@@ -148,6 +153,7 @@ export async function enqueueFieldOfflineAction(type: FieldOfflineActionType, pa
     last_error: null,
     last_attempt_at: null,
     next_retry_at: null,
+    dead: false,
   });
   await writeFieldOfflineQueue(queue);
   return { enqueued: true };
@@ -192,6 +198,7 @@ export async function getFieldSyncSnapshot(): Promise<FieldSyncSnapshot> {
   const birthCount = queue.filter((item) => item.type === "birth_report").length;
   const issueCount = queue.filter((item) => item.type === "issue_report").length;
   const failedItems = queue.filter((item) => item.retry_count > 0 || Boolean(item.last_error));
+  const deadCount = queue.filter((item) => item.dead === true).length;
   const nextRetryAt = queue
     .map((item) => item.next_retry_at)
     .filter((item): item is string => Boolean(item))
@@ -211,6 +218,7 @@ export async function getFieldSyncSnapshot(): Promise<FieldSyncSnapshot> {
       issue_report: issueCount,
     },
     failed_count: failedItems.length,
+    dead_count: deadCount,
     max_retry_count: queue.reduce((acc, item) => Math.max(acc, item.retry_count), 0),
     oldest_pending_at: queue.length > 0 ? queue[0].created_at : null,
     next_retry_at: nextRetryAt,
@@ -219,4 +227,14 @@ export async function getFieldSyncSnapshot(): Promise<FieldSyncSnapshot> {
     last_sync_result: last.last_sync_result,
     last_sync_message: last.last_sync_message,
   };
+}
+
+export async function clearDeadFieldActions(): Promise<number> {
+  const queue = await readFieldOfflineQueue();
+  const alive = queue.filter((item) => item.dead !== true);
+  const removed = queue.length - alive.length;
+  if (removed > 0) {
+    await writeFieldOfflineQueue(alive);
+  }
+  return removed;
 }
