@@ -12,10 +12,11 @@
 
 ## Current Position
 
-**Phase:** 7 — 07-ios-binary-config (next)
+**Phase:** 7 — 07-ios-binary-config (context gathered)
 **Plan:** —
-**Status:** Roadmap criado; aguardando `/gsd-plan-phase 7`
-**Last activity:** 2026-04-17 — Roadmap v1.1 gerado (6 fases, 29 REQs, 100% coverage)
+**Status:** CONTEXT.md capturado; aguardando `/gsd-plan-phase 7`
+**Last activity:** 2026-04-17 — Phase 7 discuss completo (14 decisões D-01..D-14)
+**Resume here:** `.planning/phases/07-ios-binary-config/07-CONTEXT.md`
 
 **Progress:** 0/6 phases · 0/29 REQs · `░░░░░░░░░░` 0%
 
