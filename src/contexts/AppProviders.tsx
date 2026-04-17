@@ -6,6 +6,7 @@ import { getQueryClient } from "@/src/lib/query-client";
 import { ThemeProvider } from "@/src/theme/ThemeContext";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 import { useBackgroundSync } from "@/src/hooks/useBackgroundSync";
+import { OfflineBanner } from "@/src/components/ui/OfflineBanner";
 
 const queryClient = getQueryClient();
 
@@ -26,6 +27,9 @@ export function AppProviders({ children }: PropsWithChildren) {
             <AuthProvider>
               <BackgroundSyncMount />
               {children}
+              {/* OFFLINE-05 (D-06): banner absolute no topo, renderizado
+                  fora do stack de navegação para flutuar em qualquer screen. */}
+              <OfflineBanner />
             </AuthProvider>
           </ThemeProvider>
         </QueryClientProvider>
