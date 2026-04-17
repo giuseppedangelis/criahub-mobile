@@ -1,3 +1,1 @@
-{
-  "_note": "app.config.ts é a única fonte de verdade da Expo config. Este arquivo só existe como fallback/compat para ferramentas que leem app.json diretamente. NÃO adicionar chaves sensíveis aqui (Supabase URL/anon key vêm do .env.local via dotenv em app.config.ts)."
-}
+{}
