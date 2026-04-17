@@ -1,4 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
+import { resizeForUpload } from "@/src/lib/image-upload";
 
 export interface UpdateProfileInput {
   full_name?: string | null;
@@ -37,12 +38,13 @@ export const profileService = {
 
   async uploadAvatar(userId: string, uri: string): Promise<string> {
     if (!userId || !uri) throw new Error("Parâmetros inválidos.");
-    const lower = uri.split("?")[0].toLowerCase();
-    const ext = lower.endsWith(".png") ? "png" : lower.endsWith(".webp") ? "webp" : "jpg";
-    const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    // PERF-02 (D-08/D-09): resize antes de upload — force JPEG 2000px max.
+    const resizedUri = await resizeForUpload(uri);
+    const ext = "jpg";
+    const contentType = "image/jpeg";
     const path = `${userId}/${Date.now()}_${sanitizeName("avatar")}.${ext}`;
 
-    const response = await fetch(uri);
+    const response = await fetch(resizedUri);
     const blob = await response.blob();
 
     const { error: uploadError } = await supabase.storage

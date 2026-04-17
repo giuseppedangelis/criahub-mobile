@@ -1,5 +1,6 @@
 import NetInfo from "@react-native-community/netinfo";
 import { handleSupabaseError, supabase } from "@/src/services/base";
+import { resizeForUpload } from "@/src/lib/image-upload";
 import {
   clearDeadFieldActions,
   CONCURRENCY_UPDATED_AT_KEY,
@@ -116,10 +117,12 @@ function sanitizeFileName(value: string) {
 }
 
 async function uploadPhoto(uri: string, harasId: string, folder: "birth" | "issue") {
+  // PERF-02 (D-08/D-09): resize antes de upload pra reduzir tempo/custo em 3G.
+  const resizedUri = await resizeForUpload(uri);
   const fileName = `${Date.now()}_${sanitizeFileName(folder)}.jpg`;
   const path = `${harasId}/pending-validations/${folder}/${fileName}`;
 
-  const response = await fetch(uri);
+  const response = await fetch(resizedUri);
   const blob = await response.blob();
 
   const { error } = await supabase.storage.from("animal-photos").upload(path, blob, {

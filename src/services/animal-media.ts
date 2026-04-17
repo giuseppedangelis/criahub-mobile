@@ -1,4 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
+import { resizeForUpload } from "@/src/lib/image-upload";
 
 function sanitizeName(value: string) {
   return value
@@ -34,12 +35,15 @@ function extractPathFromPublicUrl(
 export const animalMediaService = {
   async addPhoto(animalId: string, harasId: string, uri: string): Promise<string[]> {
     if (!animalId || !harasId) throw new Error("Animal ou haras inválido.");
-    const contentType = guessImageMime(uri);
-    const ext = contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg";
+    // PERF-02 (D-08/D-09): redimensiona antes de subir. Helper força JPEG 0.8
+    // a 2000px, então o contentType/extensão aqui viram jpeg.
+    const resizedUri = await resizeForUpload(uri);
+    const contentType = "image/jpeg";
+    const ext = "jpg";
     const fileName = `${Date.now()}_${sanitizeName(animalId.slice(0, 8))}.${ext}`;
     const path = `${harasId}/animals/${animalId}/${fileName}`;
 
-    const blob = await uriToBlob(uri);
+    const blob = await uriToBlob(resizedUri);
     const { error: uploadError } = await supabase.storage
       .from("animal-photos")
       .upload(path, blob, { cacheControl: "3600", upsert: false, contentType });

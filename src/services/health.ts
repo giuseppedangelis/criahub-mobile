@@ -1,4 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
+import { resizeForUpload } from "@/src/lib/image-upload";
 import type {
   CreateExamInput,
   CreateHealthRecordInput,
@@ -63,7 +64,11 @@ async function uploadExamFiles(animalId: string, files?: UploadExamFile[]) {
   for (const file of files) {
     const ext = file.file_name.includes(".") ? file.file_name.split(".").pop() : undefined;
     const fileName = `${animalId}/exams/${Date.now()}_${Math.random().toString(36).slice(2)}${ext ? `.${ext}` : ""}`;
-    const response = await fetch(file.uri);
+    // PERF-02 (D-08/D-09): resize apenas quando for imagem (MIME image/*).
+    // PDFs, docs e outros anexos seguem intactos.
+    const isImage = (file.mime_type || "").toLowerCase().startsWith("image/");
+    const sourceUri = isImage ? await resizeForUpload(file.uri) : file.uri;
+    const response = await fetch(sourceUri);
     const blob = await response.blob();
 
     const { error: uploadError } = await supabase.storage.from("animal-photos").upload(fileName, blob, {
