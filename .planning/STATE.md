@@ -1,6 +1,6 @@
 # STATE — CriaHub Mobile
 
-**Last updated:** 2026-04-16 (phase 1 planned — 4 plans ready to execute)
+**Last updated:** 2026-04-17 (v1.0 Bug Bash Pré-Loja milestone shipped)
 
 ## Project Reference
 
@@ -11,10 +11,10 @@
 
 ## Current Position
 
-**Phase:** 1 — Auth & Notifications Security (planned)
-**Plan:** 4 plans em 3 waves (01-01 NOTIF-01, 01-02/03/04 AUTH-01)
-**Status:** Ready to execute — `/gsd-execute-phase 1`
-**Progress:** [░░░░░░░░░░] 0% (0/33 requirements complete)
+**Phase:** Milestone v1.0 shipped — awaiting next milestone via `/gsd-new-milestone`
+**Plan:** —
+**Status:** v1.0 closed. 30/33 REQs shipped, 3 deferred (PERM-02, MONO-01, MONO-02).
+**Progress:** [██████████] 100% (30/33 v1.0 requirements complete; 3 deferred to next milestone)
 
 ### Phase Queue
 
@@ -29,11 +29,11 @@
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| P0 bugs remaining | 0 (submit-ready) | 8 |
-| P1 bugs remaining | 0 | 15 |
-| P2 bugs remaining | 0 | 10 |
-| Total v1 REQs closed | 33 | 0 |
-| App Store submittable | yes | no (blocked by APPLE-01 + P0s) |
+| P0 bugs remaining | 0 (submit-ready) | **0** ✓ |
+| P1 bugs remaining | 0 | 2 (PERM-02, MONO-01 deferred) |
+| P2 bugs remaining | 0 | 1 (MONO-02 deferred) |
+| Total v1 REQs closed | 33 | **30** (3 deferred) |
+| App Store submittable | yes | **yes** — APPLE-01 shipped, pendente validação EAS |
 
 ## Accumulated Context
 

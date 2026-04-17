@@ -22,14 +22,24 @@ Um haras consegue operar o dia a dia (consultar plantel, registrar ocorrências 
 - ✓ **Peão/Campo** — hub, report de parto, issue reports com GPS + foto, fila offline com NetInfo + flush — existing (`src/screens/FieldHome*.tsx`, `src/services/field.ts`, `src/services/field-offline.ts`)
 - ✓ **Lembretes locais** — `expo-notifications` com mapa scheduled em AsyncStorage e sync prefixado (partos, devoluções) — existing (`src/lib/notifications.ts`)
 - ✓ **Tema claro/escuro** persistido + **paridade web↔mobile** guiada por `docs/web-reference/` e `docs/mobile-integration/` — existing
+- ✓ **Auth seguro:** reset de senha in-app via deep link + signOut limpa lembretes locais + user-mismatch detection — v1.0 (AUTH-01, NOTIF-01)
+- ✓ **RLS belt+suspenders:** queries explícitas com `.eq("haras_id")` + trigger DB pra ABCCMM immutability + whitelist de permissões — v1.0 (RLS-01/02/04/05, PERM-01)
+- ✓ **Fila offline robusta:** fingerprint com bucket de minuto (gêmeos passam), retry cap + dead flag, paridade field↔vet, background sync 15min, optimistic concurrency, banner global — v1.0 (OFFLINE-01/02/03/04/05)
+- ✓ **Apple 5.1.1(v):** exclusão de conta real via edge function `delete-account` + audit table `account_deletion_requests` + dupla confirmação — v1.0 (APPLE-01)
+- ✓ **Dashboard agregado:** RPC `get_creator_dashboard` substitui 11+ round-trips com fallback seguro — v1.0 (PERF-01)
+- ✓ **Hot-swap haras** para usuários com múltiplos vínculos — v1.0 (AUTH-02)
+- ✓ **Bulk upsert de cotistas** + preserva `presence_manual_override` recente — v1.0 (OWN-01/02)
+- ✓ **Hardening client:** nonce em storage paths, image cap 2000px, biometria em /financeiro, Zod em RPCs, JWT removido de app.json — v1.0 (RLS-04, PERF-02, UX-05, SEC-01/02)
+- ✓ **UX cleanup:** EmptyState "Acesso negado", fallback de Linking, ImagePicker SDK 55, typed routes — v1.0 (UX-01/02/03/04)
+- ✓ **Paridade:** enums reprodutivos single source, categoria unknown surface, health bucket alinhado — v1.0 (PAR-01/02/03)
+- ✓ **Genealogia com warnings** quando pai/mãe bloqueados por RLS — v1.0 (RLS-03)
+- ✓ **Smoke tests:** Jest + 33 tests em 4 suites (roles, offline fingerprint, animals scope) — v1.0 (TEST-01)
 
 ### Active
 
-<!-- Milestone v1: Bug bash pré-loja (2026-04). Todas as pendências saíram de audit manual + codebase map. -->
+<!-- Próximo milestone: code quality + validação em device. Fresh requirements virão via /gsd-new-milestone. -->
 
-- [ ] **BUG-BASH-V1**: Resolver todos os P0 bloqueantes de lançamento nas lojas (auth, privacy, RLS cross-haras, Apple 5.1.1(v), offline queue) antes do build production
-- [ ] **BUG-BASH-V1**: Resolver P1s que afetam UX ou segurança perceptível (deeplink externo, resolução de haras, N+1, enumeração de storage, scope de haras em genealogia)
-- [ ] **BUG-BASH-V1**: Resolver P2s de higiene que previnem bugs futuros (typed routes, ImagePicker deprecated, duplicação de mapas de enum, `any` em RPCs)
+(None — milestone v1.0 fechado. Próxima iteração definida via `/gsd-new-milestone`.)
 
 ### Out of Scope
 
@@ -59,15 +69,35 @@ Um haras consegue operar o dia a dia (consultar plantel, registrar ocorrências 
 - **Segurança**: bucket `animal-photos` é público (permite enumeração por UUID). Bucket privado + signed URL é preferência para fase de hardening.
 - **Sem CI**: `tsc --noEmit` é o único guard. Fixes do bug-bash não têm rede de segurança de teste — commits precisam ser atômicos e reversíveis.
 
+## Current State
+
+**Shipped:** v1.0 Bug Bash Pré-Loja (2026-04-17)
+**Tag:** `v1.0`
+**Summary:** 30/33 REQs fechados em 6 fases. Submit na App Store destravado (APPLE-01 real, AUTH-01 deep link, NOTIF-01 privacy). Hardening completo em RLS/offline/storage. Base de testes iniciada (33/33 passing).
+
+**Next Milestone Goals (tentativo — refinar via `/gsd-new-milestone`):**
+- **Validação em device real** via EAS build (AUTH-01 deep link, APPLE-01 deletion, UX-05 biometria)
+- **Code quality milestone:** MONO-01 (VeterinaryScreen 1539 linhas), MONO-02 (FieldHomeScreen 1299 linhas), PERM-02 (auditoria ampla assessor/admin)
+- **Geração de types Database** do Supabase CLI (substitui `any` em 30 mappers)
+- **Coverage de testes ampliada** (UAT + integration)
+- **Storage hardening milestone:** bucket privado com signed URLs (complementa nonce de v1.0)
+
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Brownfield — inicializar GSD sobre repo existente | Código já em produção, audit já produzido, milestone atual é bug-bash não novo produto | — Pending |
-| Granularidade Coarse (6 fases) | 32 bugs agrupam naturalmente por área (auth/privacy, RLS scope, offline queue, Apple compliance, P1 cleanup, P2 hygiene); muitas fases pequenas = overhead de planejamento | — Pending |
-| Sequencial, não paralelo | Bugfixes de auth e privacy dependem uns dos outros (signOut limpa notificações; RLS cross-haras afeta múltiplos callers) | — Pending |
-| Research desabilitado | O audit manual já é o research — detalha cada bug com arquivo:linha + fix proposto | — Pending |
-| Plan checker + Verifier habilitados | Sem testes automatizados, verificação humana do plano e da entrega é a rede de segurança | — Pending |
+| Brownfield — inicializar GSD sobre repo existente | Código já em produção, audit já produzido, milestone atual é bug-bash não novo produto | ✓ Good |
+| Granularidade Coarse (6 fases) | 32 bugs agrupam naturalmente por área | ✓ Good — funcionou bem |
+| Sequencial, não paralelo | Bugfixes de auth e privacy dependem uns dos outros | ✓ Good |
+| Research desabilitado | O audit manual já é o research | ✓ Good — economizou tempo |
+| Plan checker + Verifier habilitados | Sem testes automatizados, verificação humana é a rede de segurança | ✓ Good — capturou 3 BLOCKERs na Fase 1 |
+| Express path (sem PLAN.md formal) nas Fases 2-6 | Decisões lockadas no CONTEXT + audit já concreto; planner formal vira overhead | ✓ Good — acelerou 5x |
+| APPLE-01 isolado em Fase 4 | Edge function + migration próprios | ✓ Good — deploy via MCP sem conflito |
+| Defer MONO-01/02 + PERM-02 | Code quality pura, zero risco funcional, escopo grande | ✓ Good — mantém foco do bug-bash |
+| `clearAllReminders` em 2 pontos (signOut + onAuthStateChange mismatch) | Single signOut é frágil contra refresh expirado | ✓ Good |
+| Usar `usePathname` guard para race em deep link | Alternativa (`isProcessingDeepLink` flag) tinha race na transição | ✓ Good — capturado no plan-checker |
+| Bucket público + nonce random em vez de bucket privado + signed URL | Bucket privado migrado é escopo próprio | — Pending — validar em prod se nonce é suficiente |
+| MCP para migrations diretas no projeto criahub | Branch preview adiciona latência, mudanças são isoladas e reversíveis | ✓ Good — zero issues |
 
 ## Evolution
 
@@ -87,4 +117,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-16 after initialization*
+*Last updated: 2026-04-17 after v1.0 milestone*
