@@ -49,7 +49,7 @@ export function TaskExecutionModal({ visible, task, loading, onClose, onSubmit }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) return;
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.7,
       allowsEditing: false,
     });

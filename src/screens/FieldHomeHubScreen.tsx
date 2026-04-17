@@ -31,7 +31,7 @@ async function capturePhoto() {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) throw new Error("Permissao de camera negada.");
   const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    mediaTypes: ["images"],
     quality: 0.7,
     allowsEditing: false,
   });
