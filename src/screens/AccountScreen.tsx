@@ -29,6 +29,7 @@ import { AppScreen } from "@/src/components/ui/AppScreen";
 import { AppButton } from "@/src/components/ui/AppButton";
 import { BrandLogo } from "@/src/components/ui/BrandLogo";
 import { Card } from "@/src/components/ui/Card";
+import { OptionSearchSelect, type SelectOption } from "@/src/components/ui/OptionSearchSelect";
 import { TextField } from "@/src/components/ui/TextField";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { profileService } from "@/src/services/profile";
@@ -58,11 +59,35 @@ function ProfileLine({ label, value }: { label: string; value: string }) {
 
 export function AccountScreen() {
   const router = useRouter();
-  const { profile, role, user, signOut, refreshProfile } = useAuth();
+  const { profile, role, user, signOut, refreshProfile, availableHaras, harasId, hotSwapHaras } =
+    useAuth();
   const { mode, theme, toggleTheme } = useAppTheme();
   const [harasName, setHarasName] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
   const canManageCreatorPages = isCreatorRole(role);
+
+  const harasOptions = useMemo<SelectOption[]>(
+    () =>
+      availableHaras.map((item) => ({
+        id: item.haras_id,
+        label: item.haras_name,
+        description: item.role ? formatRole(item.role as any) : null,
+      })),
+    [availableHaras]
+  );
+
+  const handleHarasSwap = async (nextId: string) => {
+    if (!nextId || nextId === harasId) return;
+    setSwapError(null);
+    try {
+      await hotSwapHaras(nextId);
+      // Força reload do profile + harasName label local.
+      await refreshProfile();
+    } catch (err) {
+      setSwapError(err instanceof Error ? err.message : "Falha ao trocar de haras.");
+    }
+  };
 
   useEffect(() => {
     const harasId = profile?.haras_id ?? null;
@@ -150,6 +175,33 @@ export function AccountScreen() {
 
         <ProfileLine label="Telefone" value={profile?.phone || "Não informado"} />
       </Card>
+
+      {availableHaras.length > 1 ? (
+        <Card>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>
+            Haras ativo
+          </Text>
+          <Text style={[styles.harasHint, { color: theme.colors.textMuted }]}>
+            Você participa de mais de um haras. Selecione qual deseja operar agora — o app
+            recarrega os dados do haras escolhido.
+          </Text>
+          <OptionSearchSelect
+            options={harasOptions}
+            value={harasId ?? ""}
+            onChange={(next) => {
+              void handleHarasSwap(next);
+            }}
+            placeholder="Buscar haras..."
+            emptyText="Nenhum haras encontrado."
+            allowClear={false}
+          />
+          {swapError ? (
+            <Text style={{ color: theme.colors.danger, fontSize: 13, fontWeight: "600" }}>
+              {swapError}
+            </Text>
+          ) : null}
+        </Card>
+      ) : null}
 
       {canManageCreatorPages ? (
         <Card>
@@ -599,6 +651,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontWeight: "700",
     marginBottom: 4,
+  },
+  harasHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 8,
   },
   shortcut: {
     flexDirection: "row",

@@ -9,7 +9,8 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
-import { resolveUserHarasId } from "@/src/lib/haras";
+import { listUserHaras, resolveUserHarasId, type UserHarasMembership } from "@/src/lib/haras";
+import { getQueryClient } from "@/src/lib/query-client";
 import { normalizeRole } from "@/src/lib/roles";
 import {
   clearAllReminders,
@@ -25,11 +26,13 @@ interface AuthContextValue {
   profile: UserProfile | null;
   role: UserRole;
   harasId: string | null;
+  availableHaras: UserHarasMembership[];
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  hotSwapHaras: (harasId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -40,6 +43,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [role, setRole] = useState<UserRole>("unknown");
   const [harasId, setHarasId] = useState<string | null>(null);
+  const [availableHaras, setAvailableHaras] = useState<UserHarasMembership[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const clearUserState = useCallback(() => {
@@ -48,6 +52,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(null);
     setRole("unknown");
     setHarasId(null);
+    setAvailableHaras([]);
   }, []);
 
   const loadProfile = useCallback(async (userId: string) => {
@@ -65,6 +70,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setProfile(null);
       setRole("unknown");
       setHarasId(null);
+      setAvailableHaras([]);
       return;
     }
 
@@ -83,6 +89,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(nextProfile);
     setRole(normalizedRole);
     setHarasId(nextProfile.haras_id);
+
+    // AUTH-02 (D-11): pré-carrega a lista de haras onde o usuário tem
+    // membership ativo. Em paralelo seria ideal, mas resolveUserHarasId já
+    // depende do profile — mantemos sequencial por simplicidade.
+    try {
+      const memberships = await listUserHaras(supabase, userId);
+      setAvailableHaras(memberships);
+    } catch {
+      setAvailableHaras([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -202,6 +218,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await loadProfile(user.id);
   }, [loadProfile, user?.id]);
 
+  const hotSwapHaras = useCallback(
+    async (nextHarasId: string) => {
+      // AUTH-02 (D-12): troca o haras ativo do usuário in-memory sem signOut.
+      // Regras:
+      // - usuário PRECISA ter membership ativo no haras alvo (availableHaras)
+      // - clear() no QueryClient invalida tudo que é scoped por harasId
+      //   (animais, dashboard, agenda, tasks, ownership, etc.) — as hooks
+      //   re-disparam as queries com o novo haras ativo na próxima leitura
+      if (!nextHarasId) return;
+      const membership = availableHaras.find((item) => item.haras_id === nextHarasId);
+      if (!membership) {
+        throw new Error("Você não tem acesso a este haras.");
+      }
+      if (nextHarasId === harasId) return;
+
+      setHarasId(nextHarasId);
+      setProfile((prev) => (prev ? { ...prev, haras_id: nextHarasId } : prev));
+      // Limpa todo o cache React Query — evita dados do haras anterior vazarem.
+      try {
+        getQueryClient().clear();
+      } catch {
+        // Clear é best-effort; falhas são inofensivas (cache velho é só UX stale).
+      }
+    },
+    [availableHaras, harasId]
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -209,14 +252,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
       profile,
       role,
       harasId,
+      availableHaras,
       isLoading,
       signIn,
       signOut,
       resetPassword,
       refreshProfile,
+      hotSwapHaras,
     }),
     [
+      availableHaras,
       harasId,
+      hotSwapHaras,
       isLoading,
       profile,
       refreshProfile,
