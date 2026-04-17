@@ -125,8 +125,13 @@ function mapAnimalFromDb(row: Record<string, any>): Animal {
   };
 }
 
-async function fetchRelative(id: string | null, harasId: string): Promise<AnimalRelative | null> {
-  if (!id) return null;
+interface FetchRelativeResult {
+  relative: AnimalRelative | null;
+  warning: string | null;
+}
+
+async function fetchRelative(id: string | null, harasId: string): Promise<FetchRelativeResult> {
+  if (!id) return { relative: null, warning: null };
 
   const { data, error } = await supabase
     .from("animals")
@@ -136,15 +141,23 @@ async function fetchRelative(id: string | null, harasId: string): Promise<Animal
     .maybeSingle();
 
   if (error) {
-    return null;
+    // PGRST116 = "no rows" em maybeSingle já cai no data=null, error=null.
+    // Qualquer erro real aqui é RLS ou network — não existe "not found" silencioso.
+    return {
+      relative: null,
+      warning: "Pai/mãe pode existir em outro haras ou sem permissão de acesso.",
+    };
   }
 
-  if (!data) return null;
+  if (!data) return { relative: null, warning: null };
 
   return {
-    id: data.id,
-    name: data.nome,
-    registry_number: data.registro ?? null,
+    relative: {
+      id: data.id,
+      name: data.nome,
+      registry_number: data.registro ?? null,
+    },
+    warning: null,
   };
 }
 
@@ -247,20 +260,28 @@ export const animalsService = {
     if (error) handleSupabaseError(error);
     if (!data) return null;
 
-    const [father, mother] = await Promise.all([
+    const [fatherResult, motherResult] = await Promise.all([
       fetchRelative(data.pai_id ?? null, data.haras_id),
       fetchRelative(data.mae_id ?? null, data.haras_id),
     ]);
 
     const mapped = mapAnimalFromDb(data);
 
+    // RLS-03: agrega warnings em genealogy.warnings quando o fetch foi
+    // bloqueado (RLS ou network). Nenhuma UI consome ainda — apenas
+    // disponibiliza para futuros consumidores (RLS-04).
+    const warnings = [fatherResult.warning, motherResult.warning].filter(
+      (value): value is string => Boolean(value)
+    );
+
     return {
       ...mapped,
-      father_name: mapped.father_name ?? father?.name ?? null,
-      mother_name: mapped.mother_name ?? mother?.name ?? null,
+      father_name: mapped.father_name ?? fatherResult.relative?.name ?? null,
+      mother_name: mapped.mother_name ?? motherResult.relative?.name ?? null,
       genealogy: {
-        father,
-        mother,
+        father: fatherResult.relative,
+        mother: motherResult.relative,
+        ...(warnings.length > 0 ? { warnings } : {}),
       },
     };
   },

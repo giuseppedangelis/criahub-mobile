@@ -72,6 +72,11 @@ export interface AnimalRelative {
 export interface AnimalGenealogyBasic {
   father: AnimalRelative | null;
   mother: AnimalRelative | null;
+  /**
+   * Avisos quando o fetch de pai/mãe foi bloqueado (RLS, network etc).
+   * Preenchido apenas em animalsService.getById. Não-blocking para a UI.
+   */
+  warnings?: string[];
 }
 
 export interface Animal {
