@@ -2,6 +2,7 @@ import NetInfo from "@react-native-community/netinfo";
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import {
   clearDeadFieldActions,
+  CONCURRENCY_UPDATED_AT_KEY,
   enqueueFieldOfflineAction,
   type FieldOfflineAction,
   getFieldSyncSnapshot,
@@ -54,6 +55,56 @@ function toQueueFailureItem(item: FieldOfflineAction, error: unknown): FieldOffl
 async function ensureOnline() {
   const state = await NetInfo.fetch();
   if (state.isConnected === false) throw new Error("offline");
+}
+
+/**
+ * OFFLINE-04 (D-19): snapshot do `updated_at` do animal no momento do enqueue
+ * do `issue_report`. Sem rede → silencia erro e deixa o payload sem snapshot
+ * (backcompat). Flush depois compara; se mudou, vira dead.
+ */
+async function snapshotAnimalUpdatedAt(animalId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("animals")
+      .select("updated_at")
+      .eq("id", animalId)
+      .maybeSingle();
+    if (error || !data?.updated_at) return null;
+    return String(data.updated_at);
+  } catch {
+    return null;
+  }
+}
+
+function markFieldItemAsStaleConflict(item: FieldOfflineAction): FieldOfflineAction {
+  return {
+    ...item,
+    retry_count: item.retry_count,
+    last_error: "Conflito — registro atualizado depois do enfileiramento.",
+    last_attempt_at: new Date().toISOString(),
+    next_retry_at: null,
+    dead: true,
+  };
+}
+
+async function isFieldIssueStale(item: FieldOfflineAction): Promise<boolean> {
+  const snapshot = (item.payload as Record<string, unknown>)[CONCURRENCY_UPDATED_AT_KEY];
+  if (typeof snapshot !== "string" || !snapshot) return false;
+  const animalId = (item.payload as { animal_id?: unknown }).animal_id;
+  if (typeof animalId !== "string" || !animalId) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from("animals")
+      .select("updated_at")
+      .eq("id", animalId)
+      .maybeSingle();
+    if (error || !data?.updated_at) return false;
+    const current = String(data.updated_at);
+    return current > snapshot;
+  } catch {
+    return false;
+  }
 }
 
 function sanitizeFileName(value: string) {
@@ -311,10 +362,25 @@ export const fieldService = {
     );
   },
 
-  reportIssue(payload: FieldIssueInput) {
+  async reportIssue(payload: FieldIssueInput) {
+    // OFFLINE-04 (D-19): captura snapshot de updated_at do animal ANTES de
+    // disparar a execução. Se cair na fila, o flush depois compara o snapshot
+    // com o valor atual do banco e marca como dead se mudou — evita sobrescrever
+    // estado mais novo vindo de outro operador/admin.
+    let enrichedPayload: FieldIssueInput & Record<string, unknown> = { ...payload };
+    if (payload.animal_id) {
+      const snapshot = await snapshotAnimalUpdatedAt(payload.animal_id);
+      if (snapshot) {
+        enrichedPayload = {
+          ...enrichedPayload,
+          [CONCURRENCY_UPDATED_AT_KEY]: snapshot,
+        };
+      }
+    }
+
     return withOfflineFallback(
       "issue_report",
-      payload,
+      enrichedPayload,
       () => executeIssueReport(payload),
       "Enviado! O escritório já recebeu."
     );
@@ -397,6 +463,17 @@ export const fieldService = {
         remaining.push(item);
         skippedByBackoff += 1;
         continue;
+      }
+
+      // OFFLINE-04 (D-19): antes de tentar executar, cheque se o snapshot
+      // de updated_at ainda casa com o valor atual. Se mudou, marca como dead
+      // (conflito) e não tenta — evita resurreição de estado stale.
+      if (item.type === "issue_report") {
+        const stale = await isFieldIssueStale(item);
+        if (stale) {
+          remaining.push(markFieldItemAsStaleConflict(item));
+          continue;
+        }
       }
 
       try {

@@ -12,6 +12,7 @@ import {
   writeVeterinaryLastSync,
   writeVeterinaryOfflineQueue,
 } from "@/src/services/veterinary-offline";
+import { CONCURRENCY_UPDATED_AT_KEY } from "@/src/services/field-offline";
 import { mapTaskPriorityFromDb, mapTaskStatusFromDb } from "@/src/lib/vet-shared";
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import type {
@@ -66,6 +67,76 @@ async function ensureOnline() {
 function buildVetRetryAtIso(retryCount: number) {
   const seconds = Math.min(15 * 60, 30 * 2 ** Math.max(0, retryCount - 1));
   return new Date(Date.now() + seconds * 1000).toISOString();
+}
+
+/**
+ * OFFLINE-04 (D-19): snapshots do `updated_at` do registro alvo no enqueue.
+ * Quando o flush reabrir o item, re-busca o registro e, se `updated_at` mudou,
+ * vira dead (conflito) sem tentar — evita sobrescrever estado mais novo.
+ */
+async function snapshotTaskUpdatedAt(taskId: string, harasId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("updated_at")
+      .eq("id", taskId)
+      .eq("haras_id", harasId)
+      .maybeSingle();
+    if (error || !data?.updated_at) return null;
+    return String(data.updated_at);
+  } catch {
+    return null;
+  }
+}
+
+function markVetItemAsStaleConflict(item: VeterinaryOfflineAction): VeterinaryOfflineAction {
+  return {
+    ...item,
+    retry_count: item.retry_count,
+    last_error: "Conflito — registro atualizado depois do enfileiramento.",
+    last_attempt_at: new Date().toISOString(),
+    next_retry_at: null,
+    dead: true,
+  };
+}
+
+async function isVetItemStale(item: VeterinaryOfflineAction): Promise<boolean> {
+  const snapshot = item.payload?.[CONCURRENCY_UPDATED_AT_KEY];
+  if (typeof snapshot !== "string" || !snapshot) return false;
+
+  try {
+    if (item.type === "complete_task") {
+      const taskId = item.payload?.taskId;
+      const harasId = item.payload?.harasId;
+      if (typeof taskId !== "string" || typeof harasId !== "string") return false;
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("updated_at")
+        .eq("id", taskId)
+        .eq("haras_id", harasId)
+        .maybeSingle();
+      if (error || !data?.updated_at) return false;
+      return String(data.updated_at) > snapshot;
+    }
+
+    if (item.type === "register_lavage_outcome") {
+      const taskId = item.payload?.task_id;
+      const harasId = item.payload?.haras_id;
+      if (typeof taskId !== "string" || typeof harasId !== "string") return false;
+      const { data, error } = await supabase
+        .from("tasks")
+        .select("updated_at")
+        .eq("id", taskId)
+        .eq("haras_id", harasId)
+        .maybeSingle();
+      if (error || !data?.updated_at) return false;
+      return String(data.updated_at) > snapshot;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function toVetQueueFailureItem(item: VeterinaryOfflineAction, error: unknown): VeterinaryOfflineAction {
@@ -624,19 +695,31 @@ export const veterinaryService = {
     );
   },
 
-  completeTask(payload: { taskId: string; harasId: string }) {
+  async completeTask(payload: { taskId: string; harasId: string }) {
+    // OFFLINE-04 (D-19): snapshot do updated_at da task para detectar
+    // conflito se alguém completar/alterar depois do enfileiramento.
+    const snapshot = await snapshotTaskUpdatedAt(payload.taskId, payload.harasId);
+    const enriched: Record<string, unknown> = { ...payload };
+    if (snapshot) enriched[CONCURRENCY_UPDATED_AT_KEY] = snapshot;
+
     return withOfflineFallback(
       "complete_task",
-      payload,
+      enriched,
       () => executeCompleteTask(payload),
       "Tarefa marcada como concluída."
     );
   },
 
-  registerLavageOutcome(payload: LavageOutcomeInput) {
+  async registerLavageOutcome(payload: LavageOutcomeInput) {
+    // OFFLINE-04 (D-19): snapshot do updated_at da task_id (o registro
+    // que sofre UPDATE no final do fluxo). Se mudou antes do flush, dead.
+    const snapshot = await snapshotTaskUpdatedAt(payload.task_id, payload.haras_id);
+    const enriched: Record<string, unknown> = { ...payload };
+    if (snapshot) enriched[CONCURRENCY_UPDATED_AT_KEY] = snapshot;
+
     return withOfflineFallback(
       "register_lavage_outcome",
-      payload,
+      enriched,
       () => executeRegisterLavageOutcome(payload),
       payload.outcome === "positivo"
         ? "Lavado positivo registrado com sucesso."
@@ -674,6 +757,16 @@ export const veterinaryService = {
       if (item.next_retry_at && new Date(item.next_retry_at).getTime() > Date.now()) {
         remaining.push(item);
         continue;
+      }
+
+      // OFFLINE-04 (D-19): cheque de concorrência ANTES de tentar — somente
+      // para tipos que tenham snapshot (complete_task, register_lavage_outcome).
+      if (item.type === "complete_task" || item.type === "register_lavage_outcome") {
+        const stale = await isVetItemStale(item);
+        if (stale) {
+          remaining.push(markVetItemAsStaleConflict(item));
+          continue;
+        }
       }
 
       try {

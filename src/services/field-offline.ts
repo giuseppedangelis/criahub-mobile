@@ -76,6 +76,15 @@ export function buildFieldActionFingerprint(
   return stableJson(normalized);
 }
 
+/**
+ * OFFLINE-04 (D-19): chave especial no payload que armazena o `updated_at` do
+ * registro alvo no momento do enqueue. Quando o flush desempacotar o item,
+ * comparamos este valor com o `updated_at` atual do banco; se mudou, a ação
+ * vira `dead` (conflito — alguém mais alterou o registro) em vez de sobrescrever
+ * estado mais novo. Só aplicado a ações que UPDATE (não INSERT).
+ */
+export const CONCURRENCY_UPDATED_AT_KEY = "__concurrency_updated_at";
+
 function normalizeQueueItem(item: Partial<FieldOfflineAction> & { id?: string; type?: string }): FieldOfflineAction | null {
   if (item.type !== "birth_report" && item.type !== "issue_report") return null;
   const createdAt = item.created_at || new Date().toISOString();
