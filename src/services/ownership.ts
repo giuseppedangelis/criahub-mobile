@@ -143,61 +143,55 @@ export const ownershipService = {
         .filter((id): id is string => Boolean(id && existingIds.has(id)))
     );
 
-    for (const share of prepared) {
-      if (share.id && existingIds.has(share.id)) {
-        const updatePayload: Record<string, unknown> = {
-          owner_name: share.owner_name,
-          percentage: share.percentage,
-          is_primary: share.is_primary,
-          end_date: null,
-          termination_type: share.termination_type,
-          termination_date: share.termination_date,
-          termination_age_years: share.termination_age_years,
-          physical_location: share.physical_location,
-          is_external: share.is_external,
-          updated_at: new Date().toISOString(),
-        };
-        if (share.start_date) updatePayload.start_date = share.start_date;
-        const { error: updateError } = await supabase
-          .from("animal_ownership_shares")
-          .update(updatePayload)
-          .eq("id", share.id)
-          .eq("animal_id", animalId)
-          .eq("haras_id", harasId);
-        if (updateError) handleSupabaseError(updateError);
-        continue;
+    // OWN-01: substitui loop sequencial por um único upsert + update em lote.
+    // Rows sem id (novas) são inseridas; rows existentes são atualizadas via onConflict=id.
+    const nowIso = new Date().toISOString();
+    const upsertRows = prepared.map((share) => {
+      const isExisting = Boolean(share.id && existingIds.has(share.id));
+      const row: Record<string, unknown> = {
+        animal_id: animalId,
+        haras_id: harasId,
+        owner_name: share.owner_name,
+        percentage: share.percentage,
+        is_primary: share.is_primary,
+        end_date: null,
+        termination_type: share.termination_type,
+        termination_date: share.termination_date,
+        termination_age_years: share.termination_age_years,
+        physical_location: share.physical_location,
+        is_external: share.is_external,
+        updated_at: nowIso,
+      };
+      if (isExisting) {
+        row.id = share.id;
+        if (share.start_date) row.start_date = share.start_date;
+      } else {
+        row.start_date = share.start_date || todayStr;
+        row.source = "manual";
       }
+      return row;
+    });
 
-      const { error: insertError } = await supabase
+    if (upsertRows.length > 0) {
+      const { error: upsertError } = await supabase
         .from("animal_ownership_shares")
-        .insert({
-          animal_id: animalId,
-          haras_id: harasId,
-          owner_name: share.owner_name,
-          percentage: share.percentage,
-          is_primary: share.is_primary,
-          start_date: share.start_date || todayStr,
-          end_date: null,
-          source: "manual",
-          termination_type: share.termination_type,
-          termination_date: share.termination_date,
-          termination_age_years: share.termination_age_years,
-          physical_location: share.physical_location,
-          is_external: share.is_external,
-        });
-      if (insertError) handleSupabaseError(insertError);
+        .upsert(upsertRows, { onConflict: "id" });
+      if (upsertError) handleSupabaseError(upsertError);
     }
 
-    const toDeactivate = (existingActive || []).filter((row) => !incomingIds.has(row.id));
-    for (const row of toDeactivate) {
+    const idsToDeactivate = (existingActive || [])
+      .filter((row) => !incomingIds.has(row.id))
+      .map((row) => row.id as string);
+
+    if (idsToDeactivate.length > 0) {
       const { error: deactivateError } = await supabase
         .from("animal_ownership_shares")
         .update({
           is_primary: false,
           end_date: todayStr,
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso,
         })
-        .eq("id", row.id)
+        .in("id", idsToDeactivate)
         .eq("animal_id", animalId)
         .eq("haras_id", harasId);
       if (deactivateError) handleSupabaseError(deactivateError);
