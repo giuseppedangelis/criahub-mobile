@@ -53,6 +53,9 @@ type UploadExamFile = {
   onUploaded?: () => void;
 };
 
+// TODO PAR-03: confirmar com criahub-web-v2 se "animal-photos" é o bucket
+// canônico para anexos de exames/saúde. Por ora alinhamos ao bucket
+// predominante no codebase mobile (animal-media.ts também usa animal-photos).
 async function uploadExamFiles(animalId: string, files?: UploadExamFile[]) {
   if (!files?.length) return [] as string[];
 
@@ -63,14 +66,14 @@ async function uploadExamFiles(animalId: string, files?: UploadExamFile[]) {
     const response = await fetch(file.uri);
     const blob = await response.blob();
 
-    const { error: uploadError } = await supabase.storage.from("animals").upload(fileName, blob, {
+    const { error: uploadError } = await supabase.storage.from("animal-photos").upload(fileName, blob, {
       contentType: file.mime_type || undefined,
       upsert: false,
       cacheControl: "3600",
     });
     if (uploadError) handleSupabaseError(uploadError);
 
-    const { data } = supabase.storage.from("animals").getPublicUrl(fileName);
+    const { data } = supabase.storage.from("animal-photos").getPublicUrl(fileName);
     if (data?.publicUrl) uploaded.push(data.publicUrl);
     file.onUploaded?.();
   }
