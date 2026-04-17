@@ -115,39 +115,41 @@ Explícito para evitar escopo inflado:
 
 | REQ-ID | Phase | Plan | Status |
 |--------|-------|------|--------|
-| IOS-01 | — | — | — |
-| IOS-02 | — | — | — |
-| IOS-03 | — | — | — |
-| IOS-04 | — | — | — |
-| IOS-05 | — | — | — |
-| IOS-06 | — | — | — |
-| RUNTIME-01 | — | — | — |
-| RUNTIME-02 | — | — | — |
-| RUNTIME-03 | — | — | — |
-| RUNTIME-04 | — | — | — |
-| RUNTIME-05 | — | — | — |
-| ASC-01 | — | — | — |
-| ASC-02 | — | — | — |
-| ASC-03 | — | — | — |
-| ASC-04 | — | — | — |
-| ASC-05 | — | — | — |
-| ASC-06 | — | — | — |
-| ASC-07 | — | — | — |
-| ASC-08 | — | — | — |
-| DEMO-01 | — | — | — |
-| DEMO-02 | — | — | — |
-| BUILD-01 | — | — | — |
-| BUILD-02 | — | — | — |
-| BUILD-03 | — | — | — |
-| BUILD-04 | — | — | — |
-| BUILD-05 | — | — | — |
-| BUILD-06 | — | — | — |
-| BUILD-07 | — | — | — |
-| SUBMIT-01 | — | — | — |
-| SUBMIT-02 | — | — | — |
+| IOS-01 | 7 — 07-ios-binary-config | — | Not started |
+| IOS-02 | 7 — 07-ios-binary-config | — | Not started |
+| IOS-03 | 7 — 07-ios-binary-config | — | Not started |
+| IOS-04 | 7 — 07-ios-binary-config | — | Not started |
+| IOS-05 | 7 — 07-ios-binary-config | — | Not started |
+| IOS-06 | 7 — 07-ios-binary-config | — | Not started |
+| RUNTIME-01 | 8 — 08-runtime-hardening | — | Not started |
+| RUNTIME-02 | 8 — 08-runtime-hardening | — | Not started |
+| RUNTIME-03 | 8 — 08-runtime-hardening | — | Not started |
+| RUNTIME-04 | 8 — 08-runtime-hardening | — | Not started |
+| RUNTIME-05 | 8 — 08-runtime-hardening | — | Not started |
+| ASC-01 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-02 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-03 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-04 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-05 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-06 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-07 | 9 — 09-asc-metadata-legal | — | Not started |
+| ASC-08 | 9 — 09-asc-metadata-legal | — | Not started |
+| DEMO-01 | 10 — 10-demo-seed | — | Not started |
+| DEMO-02 | 10 — 10-demo-seed | — | Not started |
+| BUILD-01 | 11 — 11-build-testflight | — | Not started |
+| BUILD-02 | 11 — 11-build-testflight | — | Not started |
+| BUILD-03 | 11 — 11-build-testflight | — | Not started |
+| BUILD-04 | 11 — 11-build-testflight | — | Not started |
+| BUILD-05 | 11 — 11-build-testflight | — | Not started |
+| BUILD-06 | 11 — 11-build-testflight | — | Not started |
+| BUILD-07 | 11 — 11-build-testflight | — | Not started |
+| SUBMIT-01 | 12 — 12-submit-review | — | Not started |
+| SUBMIT-02 | 12 — 12-submit-review | — | Not started |
+
+**Coverage:** 29/29 REQs mapped to exactly one phase ✓ · 0 orphans · 0 duplicates
 
 **Total:** 29 active REQs + 6 future + 9 out-of-scope bullets
 
 ---
 
-*Last updated: 2026-04-17 — v1.1 milestone started*
+*Last updated: 2026-04-17 — traceability preenchida via roadmapper (phases 7-12)*
