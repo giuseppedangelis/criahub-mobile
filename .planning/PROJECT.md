@@ -37,9 +37,22 @@ Um haras consegue operar o dia a dia (consultar plantel, registrar ocorrências 
 
 ### Active
 
-<!-- Próximo milestone: code quality + validação em device. Fresh requirements virão via /gsd-new-milestone. -->
+<!-- Milestone v1.1 — Submissão iOS App Store. Branch: apple. Requirements detalhados em REQUIREMENTS.md. -->
 
-(None — milestone v1.0 fechado. Próxima iteração definida via `/gsd-new-milestone`.)
+## Current Milestone: v1.1 Submissão iOS App Store — Apple Launch
+
+**Goal:** Levar o CriaHub Mobile à App Store (iPhone + iPad) passando pela review da Apple na primeira tentativa, com configuração correta, assets completos e todos os campos do App Store Connect preenchidos.
+
+**Target features:**
+- Config iOS auditada — `app.config.ts` limpo, `app.json` desduplicado, Info.plist/usage descriptions revisadas
+- Assets completos — ícone 1024, splash, screenshots 6.9"/6.7" (iPhone) + 13"/12.9" (iPad, `supportsTablet: true`)
+- Metadata App Store Connect — nome, subtitle, keywords, descrição curta+longa, promotional text, release notes v1.0.0, categoria
+- Privacy & review gates — Privacy Policy URL + Support URL hospedados, Privacy Nutrition Labels completos, age rating
+- App Review prep — demo accounts (criador/vet/peão), review notes explicando ABCCMM e ausência de IAP, contato
+- Build & upload — EAS `production` iOS, archive → TestFlight → review → release manual
+- Validação end-to-end em device real — AUTH-01 (deep link reset), APPLE-01 (exclusão), UX-05 (biometria)
+
+**Branch:** `apple` (iOS-only; Android fica para milestone seguinte)
 
 ### Out of Scope
 
@@ -117,4 +130,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 after v1.0 milestone*
+*Last updated: 2026-04-17 — milestone v1.1 Submissão iOS App Store started*
