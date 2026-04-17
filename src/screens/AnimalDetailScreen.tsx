@@ -227,7 +227,7 @@ export function AnimalDetailScreen() {
     );
   }
 
-  if (error || !animal) {
+  if (error) {
     return (
       <AppScreen>
         <View style={styles.centered}>
@@ -236,6 +236,21 @@ export function AnimalDetailScreen() {
             description={
               error instanceof Error ? error.message : "Não foi possível carregar este animal."
             }
+          />
+        </View>
+      </AppScreen>
+    );
+  }
+
+  if (!animal) {
+    // RLS devolve data: null, error: null quando o usuário não tem acesso ao animal
+    // (fora do haras ativo ou sem permissão). Diferencia do ramo de erro real acima.
+    return (
+      <AppScreen>
+        <View style={styles.centered}>
+          <EmptyState
+            title="Acesso negado"
+            description="Este animal não pertence ao haras ativo ou você não tem permissão para visualizá-lo."
           />
         </View>
       </AppScreen>
