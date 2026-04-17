@@ -1,5 +1,6 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import { resizeForUpload } from "@/src/lib/image-upload";
+import { storageNonce } from "@/src/lib/storage-nonce";
 import type {
   CreateExamInput,
   CreateHealthRecordInput,
@@ -63,7 +64,9 @@ async function uploadExamFiles(animalId: string, files?: UploadExamFile[]) {
   const uploaded: string[] = [];
   for (const file of files) {
     const ext = file.file_name.includes(".") ? file.file_name.split(".").pop() : undefined;
-    const fileName = `${animalId}/exams/${Date.now()}_${Math.random().toString(36).slice(2)}${ext ? `.${ext}` : ""}`;
+    // RLS-04 (D-02): padroniza com storageNonce em vez de Math.random isolado.
+    const nonce = storageNonce();
+    const fileName = `${animalId}/exams/${Date.now()}_${nonce}${ext ? `.${ext}` : ""}`;
     // PERF-02 (D-08/D-09): resize apenas quando for imagem (MIME image/*).
     // PDFs, docs e outros anexos seguem intactos.
     const isImage = (file.mime_type || "").toLowerCase().startsWith("image/");

@@ -1,5 +1,6 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import { resizeForUpload } from "@/src/lib/image-upload";
+import { storageNonce } from "@/src/lib/storage-nonce";
 
 export interface UpdateProfileInput {
   full_name?: string | null;
@@ -42,7 +43,9 @@ export const profileService = {
     const resizedUri = await resizeForUpload(uri);
     const ext = "jpg";
     const contentType = "image/jpeg";
-    const path = `${userId}/${Date.now()}_${sanitizeName("avatar")}.${ext}`;
+    // RLS-04 (D-02): nonce no path do avatar.
+    const nonce = storageNonce();
+    const path = `${userId}/${Date.now()}_${nonce}_${sanitizeName("avatar")}.${ext}`;
 
     const response = await fetch(resizedUri);
     const blob = await response.blob();

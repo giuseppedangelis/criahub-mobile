@@ -1,5 +1,6 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import { resizeForUpload } from "@/src/lib/image-upload";
+import { storageNonce } from "@/src/lib/storage-nonce";
 import type {
   CreateTaskInput,
   ExecuteTaskInput,
@@ -144,7 +145,9 @@ export const tasksService = {
 
   async uploadAttachment(taskId: string, harasId: string, file: { uri: string; file_name: string; mime_type?: string | null; kind: "photo" | "document"; }) {
     const sanitized = sanitizeFileName(file.file_name || `${file.kind}-${Date.now()}`);
-    const filePath = `${harasId}/tasks/${taskId}/${file.kind}/${Date.now()}_${sanitized}`;
+    // RLS-04 (D-02): nonce impede enumeração de anexos de task.
+    const nonce = storageNonce();
+    const filePath = `${harasId}/tasks/${taskId}/${file.kind}/${Date.now()}_${nonce}_${sanitized}`;
     // PERF-02 (D-08/D-09): resize apenas quando é foto; documentos
     // (pdf, docx etc) passam direto sem processar.
     const sourceUri = file.kind === "photo" ? await resizeForUpload(file.uri) : file.uri;

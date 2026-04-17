@@ -1,5 +1,6 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import { resizeForUpload } from "@/src/lib/image-upload";
+import { storageNonce } from "@/src/lib/storage-nonce";
 
 function sanitizeName(value: string) {
   return value
@@ -40,7 +41,9 @@ export const animalMediaService = {
     const resizedUri = await resizeForUpload(uri);
     const contentType = "image/jpeg";
     const ext = "jpg";
-    const fileName = `${Date.now()}_${sanitizeName(animalId.slice(0, 8))}.${ext}`;
+    // RLS-04 (D-01): injeta nonce no path para impedir enumeração.
+    const nonce = storageNonce();
+    const fileName = `${Date.now()}_${nonce}_${sanitizeName(animalId.slice(0, 8))}.${ext}`;
     const path = `${harasId}/animals/${animalId}/${fileName}`;
 
     const blob = await uriToBlob(resizedUri);
@@ -193,7 +196,9 @@ export const animalMediaService = {
   ): Promise<void> {
     if (!animalId || !harasId) throw new Error("Animal ou haras inválido.");
     const safeName = sanitizeName(input.fileName || `documento-${Date.now()}`);
-    const path = `${harasId}/animals/${animalId}/${Date.now()}_${safeName}`;
+    // RLS-04 (D-02): nonce impede enumeração do bucket "documents" também.
+    const nonce = storageNonce();
+    const path = `${harasId}/animals/${animalId}/${Date.now()}_${nonce}_${safeName}`;
 
     const blob = await uriToBlob(input.fileUri);
     const { error: uploadError } = await supabase.storage

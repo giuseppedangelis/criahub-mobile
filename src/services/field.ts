@@ -1,6 +1,7 @@
 import NetInfo from "@react-native-community/netinfo";
 import { handleSupabaseError, supabase } from "@/src/services/base";
 import { resizeForUpload } from "@/src/lib/image-upload";
+import { storageNonce } from "@/src/lib/storage-nonce";
 import {
   clearDeadFieldActions,
   CONCURRENCY_UPDATED_AT_KEY,
@@ -119,7 +120,9 @@ function sanitizeFileName(value: string) {
 async function uploadPhoto(uri: string, harasId: string, folder: "birth" | "issue") {
   // PERF-02 (D-08/D-09): resize antes de upload pra reduzir tempo/custo em 3G.
   const resizedUri = await resizeForUpload(uri);
-  const fileName = `${Date.now()}_${sanitizeFileName(folder)}.jpg`;
+  // RLS-04 (D-02): nonce impede enumeração de fotos de nascimento/ocorrência.
+  const nonce = storageNonce();
+  const fileName = `${Date.now()}_${nonce}_${sanitizeFileName(folder)}.jpg`;
   const path = `${harasId}/pending-validations/${folder}/${fileName}`;
 
   const response = await fetch(resizedUri);
