@@ -25,6 +25,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     buildNumber: "1",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // OFFLINE-03 (D-17): background-fetch precisa de "fetch" em
+      // UIBackgroundModes para o iOS acordar o app periodicamente e rodar
+      // a task criahub-offline-sync.
+      UIBackgroundModes: ["fetch"],
       NSCameraUsageDescription:
         "O CriaHub usa a câmera para registrar fotos de animais, documentos e foto de perfil.",
       NSPhotoLibraryUsageDescription:
