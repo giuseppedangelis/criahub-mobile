@@ -15,6 +15,9 @@ export function formatCategoryLabel(category: AnimalCategory): string {
     garanhao: "Garanhão",
     egua: "Égua",
     castrado: "Castrado",
+    // PAR-02 (D-15): categoria surfaced quando o DB traz valor fora do mapa
+    // canônico. Mostra "Desconhecida" em vez de classificar mal como potro.
+    unknown: "Desconhecida",
   };
   return labels[category];
 }

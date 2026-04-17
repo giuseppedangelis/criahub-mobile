@@ -21,7 +21,8 @@ export type AnimalCategory =
   | "potra"
   | "garanhao"
   | "egua"
-  | "castrado";
+  | "castrado"
+  | "unknown";
 
 export type AnimalStatus =
   | "ativo"

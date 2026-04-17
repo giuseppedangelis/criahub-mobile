@@ -22,6 +22,7 @@ const CATEGORY_MAPPING: Record<AnimalCategory, string> = {
   garanhao: "Garanhão",
   egua: "Égua",
   castrado: "Castrado",
+  unknown: "Desconhecida",
 };
 
 const CATEGORY_MAPPING_DB_TO_APP: Record<string, AnimalCategory> = {
@@ -81,7 +82,18 @@ const ANIMAL_SELECT_FIELDS = `
 function mapAnimalFromDb(row: Record<string, any>): Animal {
   const images = Array.isArray(row.images) ? row.images : [];
   const mainImage = row.foto_url || images[0] || null;
-  const mappedCategory = CATEGORY_MAPPING_DB_TO_APP[row.categoria] ?? "potro";
+  // PAR-02 (D-15): categorias fora do mapa viram "unknown" em vez de cair
+  // silenciosamente em "potro". Isso faz a UI exibir estado real de dado sujo
+  // e evita classificar mal um animal importado.
+  let mappedCategory: AnimalCategory;
+  if (row.categoria != null && CATEGORY_MAPPING_DB_TO_APP[row.categoria]) {
+    mappedCategory = CATEGORY_MAPPING_DB_TO_APP[row.categoria];
+  } else {
+    if (row.categoria != null) {
+      console.warn("[animals] unknown category from DB:", row.categoria);
+    }
+    mappedCategory = "unknown";
+  }
   const category = resolveCategoryByAge(row.sexo ?? null, row.data_nascimento ?? null, mappedCategory);
 
   return {
