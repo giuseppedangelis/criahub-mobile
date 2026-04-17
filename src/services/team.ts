@@ -1,4 +1,17 @@
+import { z } from "zod";
 import { handleSupabaseError, supabase } from "@/src/services/base";
+
+// SEC-01 (D-16): RPCs retornam shape `{ ok?: boolean, error?: string }` (ou null).
+// Usar .passthrough para não rejeitar campos extras que o backend possa adicionar.
+// Se o shape vier totalmente diferente, safeParse falha e a gente loga warning
+// + segue com fallback seguro (vira sucesso silencioso pra evitar travar o usuário
+// quando o retorno é null mas o erro foi nulo).
+const RpcResultSchema = z
+  .object({
+    ok: z.boolean().optional(),
+    error: z.string().optional(),
+  })
+  .passthrough();
 
 export type TeamPermissionKey =
   | "viewHerd"
@@ -187,8 +200,16 @@ export const teamService = {
       p_status: status,
     });
     if (error) handleSupabaseError(error);
-    if (data && typeof data === "object" && typeof (data as any).error === "string") {
-      throw new Error((data as any).error);
+    // SEC-01 (D-16): valida shape do retorno com Zod antes de consumir.
+    if (data != null && typeof data === "object") {
+      const parsed = RpcResultSchema.safeParse(data);
+      if (!parsed.success) {
+        console.warn("[team] set_haras_member_status returned unexpected shape:", data);
+        return;
+      }
+      if (parsed.data.error) {
+        throw new Error(parsed.data.error);
+      }
     }
   },
 
@@ -198,8 +219,16 @@ export const teamService = {
       p_haras_id: harasId,
     });
     if (error) handleSupabaseError(error);
-    if (data && typeof data === "object" && typeof (data as any).error === "string") {
-      throw new Error((data as any).error);
+    // SEC-01 (D-16): valida shape do retorno com Zod antes de consumir.
+    if (data != null && typeof data === "object") {
+      const parsed = RpcResultSchema.safeParse(data);
+      if (!parsed.success) {
+        console.warn("[team] remove_haras_member returned unexpected shape:", data);
+        return;
+      }
+      if (parsed.data.error) {
+        throw new Error(parsed.data.error);
+      }
     }
   },
 };
