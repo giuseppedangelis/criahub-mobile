@@ -236,6 +236,141 @@ async function fetchRecentActivity(
   return items.slice(0, limit);
 }
 
+/**
+ * PERF-01 (D-14/D-15): coerce do retorno da RPC `get_creator_dashboard` para
+ * CreatorDashboardData. A RPC devolve jsonb no mesmo shape, mas números podem
+ * vir como string ou number dependendo do driver — normaliza tudo aqui.
+ */
+function coerceDashboardRpc(raw: unknown): CreatorDashboardData | null {
+  if (!raw || typeof raw !== "object") return null;
+  const payload = raw as Record<string, unknown>;
+  const countersRaw = payload.counters as Record<string, unknown> | undefined;
+  const activityRaw = Array.isArray(payload.activity) ? payload.activity : [];
+  if (!countersRaw) return null;
+
+  const toNum = (value: unknown): number => {
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+  };
+
+  const toNullableNum = (value: unknown): number | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  };
+
+  const counters: DashboardCounters = {
+    totalAnimals: toNum(countersRaw.totalAnimals),
+    activeGestations: toNum(countersRaw.activeGestations),
+    pendingServices: toNum(countersRaw.pendingServices),
+    animalsNeedingCare: toNum(countersRaw.animalsNeedingCare),
+    atHaras: toNum(countersRaw.atHaras),
+    away: toNum(countersRaw.away),
+    monthlyRevenue: toNum(countersRaw.monthlyRevenue),
+    monthlyExpenses: toNum(countersRaw.monthlyExpenses),
+  };
+
+  const validTypes: DashboardActivityType[] = ["transaction", "event", "task", "reproduction"];
+  const validVariants: Array<NonNullable<DashboardActivityItem["variant"]>> = [
+    "income",
+    "expense",
+    "pending",
+    "done",
+    "info",
+  ];
+
+  const activity: DashboardActivityItem[] = [];
+  for (const item of activityRaw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const id = typeof row.id === "string" ? row.id : null;
+    const type = typeof row.type === "string" ? row.type : null;
+    const title = typeof row.title === "string" ? row.title : null;
+    const date = typeof row.date === "string" ? row.date : null;
+    if (!id || !type || !title || !date) continue;
+    if (!validTypes.includes(type as DashboardActivityType)) continue;
+    const variantRaw = typeof row.variant === "string" ? row.variant : null;
+    const variant =
+      variantRaw && validVariants.includes(variantRaw as NonNullable<DashboardActivityItem["variant"]>)
+        ? (variantRaw as DashboardActivityItem["variant"])
+        : undefined;
+    activity.push({
+      id,
+      type: type as DashboardActivityType,
+      title,
+      detail: typeof row.detail === "string" ? row.detail : null,
+      date,
+      amount: toNullableNum(row.amount),
+      variant,
+    });
+  }
+
+  const warnings = Array.isArray(payload.warnings)
+    ? payload.warnings.filter((value): value is string => typeof value === "string")
+    : [];
+
+  return { counters, activity, warnings };
+}
+
+async function fetchDashboardViaFallback(harasId: string): Promise<CreatorDashboardData> {
+  // Caminho antigo (11 queries em paralelo) preservado para ambientes onde a
+  // RPC ainda não foi aplicada (dev local sem migration, ou rollback).
+  const warnings: string[] = [];
+  const safe = async <T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await fn();
+    } catch (err) {
+      warnings.push(`${label}: ${err instanceof Error ? err.message : "erro"}`);
+      return fallback;
+    }
+  };
+
+  const [
+    totalAnimals,
+    presence,
+    activeGestations,
+    pendingServices,
+    animalsNeedingCare,
+    finance,
+    activity,
+  ] = await Promise.all([
+    safe("total_animais", () => countActiveAnimals(harasId), 0),
+    safe("presenca", () => countPresence(harasId), { atHaras: 0, away: 0 }),
+    safe("gestacoes", () => countActiveGestations(harasId), 0),
+    safe("servicos", () => countPendingServices(harasId), 0),
+    safe("cuidado", () => countAnimalsNeedingCare(harasId), 0),
+    safe(
+      "financeiro",
+      () => computeMonthlyFinance(harasId),
+      { monthlyRevenue: 0, monthlyExpenses: 0 }
+    ),
+    safe("atividade", () => fetchRecentActivity(harasId), [] as DashboardActivityItem[]),
+  ]);
+
+  return {
+    counters: {
+      totalAnimals,
+      activeGestations,
+      pendingServices,
+      animalsNeedingCare,
+      atHaras: presence.atHaras,
+      away: presence.away,
+      monthlyRevenue: finance.monthlyRevenue,
+      monthlyExpenses: finance.monthlyExpenses,
+    },
+    activity,
+    warnings,
+  };
+}
+
 export const dashboardService = {
   async getCreatorDashboard(harasId: string): Promise<CreatorDashboardData> {
     if (!harasId) {
@@ -255,55 +390,29 @@ export const dashboardService = {
       };
     }
 
-    const warnings: string[] = [];
-    const safe = async <T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> => {
-      try {
-        return await fn();
-      } catch (err) {
-        warnings.push(`${label}: ${err instanceof Error ? err.message : "erro"}`);
-        return fallback;
-      }
-    };
-
-    const [
-      totalAnimals,
-      presence,
-      activeGestations,
-      pendingServices,
-      animalsNeedingCare,
-      finance,
-      activity,
-    ] = await Promise.all([
-      safe("total_animais", () => countActiveAnimals(harasId), 0),
-      safe(
-        "presenca",
-        () => countPresence(harasId),
-        { atHaras: 0, away: 0 }
-      ),
-      safe("gestacoes", () => countActiveGestations(harasId), 0),
-      safe("servicos", () => countPendingServices(harasId), 0),
-      safe("cuidado", () => countAnimalsNeedingCare(harasId), 0),
-      safe(
-        "financeiro",
-        () => computeMonthlyFinance(harasId),
-        { monthlyRevenue: 0, monthlyExpenses: 0 }
-      ),
-      safe("atividade", () => fetchRecentActivity(harasId), [] as DashboardActivityItem[]),
-    ]);
-
-    return {
-      counters: {
-        totalAnimals,
-        activeGestations,
-        pendingServices,
-        animalsNeedingCare,
-        atHaras: presence.atHaras,
-        away: presence.away,
-        monthlyRevenue: finance.monthlyRevenue,
-        monthlyExpenses: finance.monthlyExpenses,
-      },
-      activity,
-      warnings,
-    };
+    // PERF-01 (D-14/D-15): tenta a RPC agregada primeiro. Se a RPC não
+    // existir (migration ainda não aplicada no ambiente) ou retornar erro,
+    // cai pro caminho antigo com 11 round-trips + injeta warning pra UI.
+    try {
+      const { data, error } = await supabase.rpc("get_creator_dashboard", {
+        p_haras_id: harasId,
+        p_activity_limit: 10,
+      });
+      if (error) throw new Error(error.message);
+      const parsed = coerceDashboardRpc(data);
+      if (parsed) return parsed;
+      // RPC respondeu mas com shape inesperado — trata como miss e cai no fallback.
+      throw new Error("Resposta RPC inválida.");
+    } catch (err) {
+      const fallback = await fetchDashboardViaFallback(harasId);
+      return {
+        ...fallback,
+        warnings: [
+          "Fallback: dashboard RPC não disponível, usando queries paralelas.",
+          ...fallback.warnings,
+          err instanceof Error ? `rpc: ${err.message}` : "rpc: erro",
+        ],
+      };
+    }
   },
 };
