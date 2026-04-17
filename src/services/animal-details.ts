@@ -1,4 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
+import { REPRODUCTIVE_EVENT_LABELS } from "@/src/types/domain";
 
 export interface AnimalDocumentItem {
   id: string;
@@ -80,15 +81,7 @@ export interface AnimalExtendedDetails {
 }
 
 function formatReproductionEventType(value: string) {
-  const labels: Record<string, string> = {
-    cobertura: "Cobertura",
-    inseminacao: "Inseminação",
-    coleta_ovulos: "Coleta de Óvulos",
-    transferencia_embriao: "Transferência de Embrião",
-    diagnostico_gestacao: "Diagnóstico de Gestação",
-    parto: "Parto",
-  };
-  return labels[value] || value;
+  return REPRODUCTIVE_EVENT_LABELS[value] || value;
 }
 
 function formatExamResult(result: string | null, laboratorio: string | null) {

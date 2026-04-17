@@ -33,6 +33,26 @@ export type AnimalStatus =
 
 export type AnimalEnvironment = "oficial" | "avulsos" | "vinculacao" | "condominio";
 
+/**
+ * Single source of truth para labels de eventos reprodutivos.
+ *
+ * Antes existiam dois mapas divergentes em src/services/animal-details.ts
+ * (formatReproductionEventType) e src/services/dashboard.ts
+ * (REPRODUCTION_EVENT_LABELS). Unificado aqui para manter paridade
+ * web↔mobile — altere somente em conjunto com criahub-web-v2.
+ */
+export const REPRODUCTIVE_EVENT_LABELS: Record<string, string> = {
+  cobertura: "Cobertura",
+  inseminacao: "Inseminação",
+  coleta_ovulos: "Coleta de óvulos",
+  transferencia_embriao: "Transferência de embrião",
+  diagnostico_gestacao: "Diagnóstico de gestação",
+  parto: "Parto",
+  aborto: "Aborto",
+  ovulacao: "Ovulação",
+  aplicacao_p4: "Aplicação P4",
+};
+
 export interface UserProfile {
   id: string;
   email: string | null;

@@ -1,4 +1,5 @@
 import { handleSupabaseError, supabase } from "@/src/services/base";
+import { REPRODUCTIVE_EVENT_LABELS } from "@/src/types/domain";
 
 export interface DashboardCounters {
   totalAnimals: number;
@@ -34,15 +35,6 @@ export interface CreatorDashboardData {
 }
 
 const CARE_MANAGEMENT_STATUSES = ["Em tratamento", "Em observacao", "Em coleta"];
-const REPRODUCTION_EVENT_LABELS: Record<string, string> = {
-  cobertura: "Cobertura",
-  inseminacao: "Inseminação",
-  coleta_ovulos: "Coleta de óvulos",
-  transferencia_embriao: "Transferência de embrião",
-  diagnostico_gestacao: "Diagnóstico de gestação",
-  parto: "Parto",
-  aplicacao_p4: "Aplicação P4",
-};
 
 function monthRangeUtc(reference = new Date()) {
   const year = reference.getUTCFullYear();
@@ -229,7 +221,7 @@ async function fetchRecentActivity(
   }
 
   for (const row of reproRes.data ?? []) {
-    const label = REPRODUCTION_EVENT_LABELS[row.event_type as string] ?? row.event_type;
+    const label = REPRODUCTIVE_EVENT_LABELS[row.event_type as string] ?? row.event_type;
     items.push({
       id: `rp-${row.id}`,
       type: "reproduction",
