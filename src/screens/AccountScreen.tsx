@@ -3,7 +3,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -206,43 +205,69 @@ export function AccountScreen() {
           }}
         />
         <AppButton
-          label="Solicitar exclusão da conta"
+          label="Excluir minha conta"
           variant="danger"
           onPress={() => {
+            // APPLE-01: exclusão in-app real (Apple 5.1.1(v)). Dupla confirmação
+            // antes de invocar a edge function `delete-account` que grava audit
+            // + chama auth.admin.deleteUser(). Após sucesso, signOut local dispara
+            // redirect pra /(auth)/login via onAuthStateChange.
             Alert.alert(
-              "Excluir conta",
-              "Vamos abrir seu e-mail com uma solicitação pré-preenchida para o suporte do CriaHub. Seus dados serão removidos em até 30 dias após a confirmação.",
+              "Excluir conta?",
+              "Esta ação remove permanentemente sua conta e todos os dados vinculados. Você não conseguirá mais acessar o CriaHub com este email.",
               [
                 { text: "Cancelar", style: "cancel" },
                 {
                   text: "Continuar",
                   style: "destructive",
-                  onPress: async () => {
-                    const email = profile?.email ?? user?.email ?? "(não informado)";
-                    const userId = user?.id ?? "(não informado)";
-                    const subject = encodeURIComponent(
-                      "Solicitação de exclusão de conta CriaHub"
+                  onPress: () => {
+                    Alert.alert(
+                      "Tem certeza?",
+                      "Última confirmação. Após tocar em \"Excluir minha conta\" a exclusão é processada e você será deslogado.",
+                      [
+                        { text: "Cancelar", style: "cancel" },
+                        {
+                          text: "Excluir minha conta",
+                          style: "destructive",
+                          onPress: async () => {
+                            try {
+                              const { data, error } = await supabase.functions.invoke<{
+                                success?: boolean;
+                                error?: string;
+                                details?: string;
+                              }>("delete-account", { method: "POST" });
+
+                              if (error || !data?.success) {
+                                const message =
+                                  error?.message ??
+                                  data?.error ??
+                                  "Não foi possível excluir agora.";
+                                Alert.alert(
+                                  "Erro ao excluir conta",
+                                  `${message}\n\nSe o problema persistir, escreva pra suporte@criahub.com.br.`
+                                );
+                                return;
+                              }
+
+                              Alert.alert(
+                                "Conta excluída",
+                                "Seu acesso foi encerrado. Se precisar de algo, escreva pra suporte@criahub.com.br."
+                              );
+                              await signOut();
+                            } catch (err) {
+                              const message =
+                                err instanceof Error
+                                  ? err.message
+                                  : "Erro inesperado.";
+                              Alert.alert(
+                                "Erro ao excluir conta",
+                                `${message}\n\nSe o problema persistir, escreva pra suporte@criahub.com.br.`
+                              );
+                            }
+                          },
+                        },
+                      ]
                     );
-                    const body = encodeURIComponent(
-                      `Olá,\n\nSolicito a exclusão permanente da minha conta no CriaHub e de todos os dados associados.\n\nEmail da conta: ${email}\nID do usuário: ${userId}\n\nObrigado.`
-                    );
-                    const url = `mailto:suporte@criahub.com.br?subject=${subject}&body=${body}`;
-                    try {
-                      const canOpen = await Linking.canOpenURL(url);
-                      if (!canOpen) {
-                        Alert.alert(
-                          "Abra seu e-mail",
-                          "Envie um pedido para suporte@criahub.com.br com o assunto 'Solicitação de exclusão de conta' informando seu email e ID do usuário."
-                        );
-                        return;
-                      }
-                      await Linking.openURL(url);
-                    } catch {
-                      Alert.alert(
-                        "Erro",
-                        "Não foi possível abrir o app de e-mail. Envie um pedido manualmente para suporte@criahub.com.br."
-                      );
-                    }
                   },
                 },
               ]
