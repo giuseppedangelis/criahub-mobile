@@ -25,6 +25,7 @@ import {
   useMonthlyFinancialSummary,
   useTransactionsQuery,
 } from "@/src/hooks/useFinancial";
+import { useBiometricGate } from "@/src/hooks/useBiometricGate";
 import { isCreatorRole } from "@/src/lib/roles";
 import { useAppTheme } from "@/src/theme/ThemeContext";
 import type { TransactionType } from "@/src/services/financial";
@@ -83,9 +84,14 @@ export function CreatorFinancialScreen() {
   const [filter, setFilter] = useState<Filter>("todos");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const summaryQuery = useMonthlyFinancialSummary(canAccess ? harasId : null);
+  // UX-05 (D-12/D-13/D-14): biometria antes de exibir dados financeiros.
+  const biometric = useBiometricGate("financial");
+
+  const summaryQuery = useMonthlyFinancialSummary(
+    canAccess && biometric.isAuthenticated ? harasId : null
+  );
   const listQuery = useTransactionsQuery({
-    haras_id: harasId ?? "",
+    haras_id: canAccess && biometric.isAuthenticated ? harasId ?? "" : "",
     tipo: filter,
   });
   const createMutation = useCreateTransactionMutation(harasId);
@@ -118,6 +124,30 @@ export function CreatorFinancialScreen() {
             title="Financeiro"
             description="Disponível apenas para o criador do haras."
           />
+        </View>
+      </AppScreen>
+    );
+  }
+
+  // UX-05 (D-13): gate visual antes de exibir qualquer dado financeiro.
+  // Graceful: quando o hardware biométrico não existe/não enrolado, o
+  // hook já libera acesso automaticamente em mount.
+  if (biometric.isReady && !biometric.isAuthenticated) {
+    return (
+      <AppScreen>
+        <View style={styles.centered}>
+          <EmptyState
+            title="Autenticação necessária"
+            description="Confirme sua identidade para ver receitas, despesas e movimentações do mês."
+          />
+          <View style={{ marginTop: 12, alignSelf: "stretch" }}>
+            <AppButton
+              label="Autenticar"
+              onPress={() => {
+                void biometric.requireAuth();
+              }}
+            />
+          </View>
         </View>
       </AppScreen>
     );
