@@ -184,7 +184,8 @@ export function CreatorDashboardScreen() {
               </Text>
             </View>
             <Pressable
-              onPress={() => router.push("/(app)/(tabs)/avisos" as any)}
+              // UX-04 (D-10): object form é inferido pelo Expo Router com typedRoutes.
+              onPress={() => router.push({ pathname: "/(app)/(tabs)/avisos" })}
               accessibilityLabel="Avisos"
               style={({ pressed }) => [
                 styles.bellButton,
@@ -246,7 +247,7 @@ export function CreatorDashboardScreen() {
                 }
                 icon={TrendingUp}
                 tone={balance >= 0 ? "success" : "warning"}
-                onPress={() => router.push("/(app)/financeiro" as any)}
+                onPress={() => router.push({ pathname: "/(app)/financeiro" })}
               />
               <DashboardTile
                 title="Precisam de cuidado"

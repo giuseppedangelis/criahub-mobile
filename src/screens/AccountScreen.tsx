@@ -209,12 +209,13 @@ export function AccountScreen() {
           <AccountShortcut
             icon={TrendingUp}
             label="Financeiro"
-            onPress={() => router.push("/(app)/financeiro" as any)}
+            // UX-04 (D-10): object form é inferido pelo Expo Router com typedRoutes.
+            onPress={() => router.push({ pathname: "/(app)/financeiro" })}
           />
           <AccountShortcut
             icon={Users}
             label="Equipe"
-            onPress={() => router.push("/(app)/equipe" as any)}
+            onPress={() => router.push({ pathname: "/(app)/equipe" })}
           />
         </Card>
       ) : null}

@@ -97,7 +97,13 @@ export function CreatorNoticesScreen() {
     return (
       <Pressable
         key={`${item.animal_id}-${item.due_date}`}
-        onPress={() => router.push(`/(app)/animal/${item.animal_id}` as any)}
+        // UX-04 (D-10): typed routes via object form com params tipados.
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/animal/[id]",
+            params: { id: item.animal_id },
+          })
+        }
         style={({ pressed }) => [styles.itemRow, { opacity: pressed ? 0.85 : 1 }]}
       >
         <View
