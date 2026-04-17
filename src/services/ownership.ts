@@ -203,10 +203,26 @@ export const ownershipService = {
       proprietario: primaryOwner,
       updated_at: new Date().toISOString(),
     };
+
     if (hasExternalShare) {
-      animalPayload.is_at_haras = false;
-      animalPayload.presence_manual_override = false;
+      // OWN-02: não sobrescrever presença automaticamente se o usuário tocou
+      // no toggle manual de presença. Manual wins.
+      const { data: animalAtual, error: readAnimalErr } = await supabase
+        .from("animals")
+        .select("presence_manual_override")
+        .eq("id", animalId)
+        .eq("haras_id", harasId)
+        .maybeSingle();
+      if (readAnimalErr) handleSupabaseError(readAnimalErr);
+
+      if (animalAtual?.presence_manual_override === true) {
+        console.log("[ownership] skip auto presence override — manual flag set");
+      } else {
+        animalPayload.is_at_haras = false;
+        animalPayload.presence_manual_override = false;
+      }
     }
+
     const { error: animalErr } = await supabase
       .from("animals")
       .update(animalPayload)
