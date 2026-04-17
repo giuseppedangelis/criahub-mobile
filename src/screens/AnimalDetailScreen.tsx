@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useLayoutEffect } from "react";
 import {
+  Alert,
   Image,
   Linking,
   Modal,
@@ -242,9 +243,22 @@ export function AnimalDetailScreen() {
   }
 
   const openExternalUrl = async (url: string) => {
-    const canOpen = await Linking.canOpenURL(url);
-    if (!canOpen) return;
-    await Linking.openURL(url);
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        Alert.alert(
+          "Não foi possível abrir",
+          `O link parece inválido ou não há app para abri-lo.\n\n${url}`
+        );
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(
+        "Não foi possível abrir",
+        `O link parece inválido ou não há app para abri-lo.\n\n${url}`
+      );
+    }
   };
 
   const onOpenPhoto = (index: number) => {
